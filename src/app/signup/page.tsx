@@ -1,0 +1,99 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+
+export default function SignupPage() {
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    const supabase = createClient()
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: name } },
+    })
+
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+      return
+    }
+
+    router.push('/planner')
+    router.refresh()
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 text-center">
+          <span className="inline-flex items-center gap-2 text-2xl font-semibold text-gray-900">
+            <span className="w-3 h-3 rounded-full bg-brand-500 inline-block" />
+            Scullery
+          </span>
+          <p className="mt-2 text-sm text-gray-500">Create your household account</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="card p-6 space-y-4">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+          )}
+          <div>
+            <label className="label">Name</label>
+            <input
+              type="text"
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="label">Email</label>
+            <input
+              type="email"
+              className="input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="label">Password</label>
+            <input
+              type="password"
+              className="input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+          </div>
+          <button type="submit" className="btn-primary w-full justify-center" disabled={loading}>
+            {loading ? 'Creating account…' : 'Create account'}
+          </button>
+        </form>
+
+        <p className="mt-4 text-center text-sm text-gray-500">
+          Already have an account?{' '}
+          <Link href="/login" className="text-brand-600 hover:underline">
+            Sign in
+          </Link>
+        </p>
+      </div>
+    </div>
+  )
+}
