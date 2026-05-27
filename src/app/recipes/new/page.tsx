@@ -79,9 +79,11 @@ export default function NewRecipePage() {
 
   const candidates = (imported?.image_candidates ?? []).filter((u) => !failedImages.has(u))
 
-  // Merge selected image into the form initial values
+  // Merge selected image into the form initial values.
+  // Use '' (not undefined) for "no photo" so the RecipeForm useEffect can
+  // react to the change and clear any previously selected URL.
   const formInitial: ImportedRecipe | undefined = imported
-    ? { ...imported, photo_url: selectedImage ?? undefined }
+    ? { ...imported, photo_url: selectedImage ?? '' }
     : undefined
 
   if (!householdId) {

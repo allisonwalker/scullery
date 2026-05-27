@@ -8,6 +8,7 @@ interface PlannerState {
   config: PlanConfig
   previewSlots: PreviewSlot[] | null  // non-null during regeneration preview
   swapTargetSlot: PlanSlot | null
+  swapSheetTab: 'library' | 'generate'
   slideOverRecipe: Recipe | null
   isRegenerating: boolean
 
@@ -24,7 +25,7 @@ interface PlannerState {
   clearPreview: () => void
 
   // UI state
-  openSwapSheet: (slot: PlanSlot) => void
+  openSwapSheet: (slot: PlanSlot, tab?: 'library' | 'generate') => void
   closeSwapSheet: () => void
   openSlideOver: (recipe: Recipe) => void
   closeSlideOver: () => void
@@ -45,6 +46,7 @@ export const usePlannerStore = create<PlannerState>((set) => ({
   config: DEFAULT_CONFIG,
   previewSlots: null,
   swapTargetSlot: null,
+  swapSheetTab: 'library',
   slideOverRecipe: null,
   isRegenerating: false,
 
@@ -79,7 +81,7 @@ export const usePlannerStore = create<PlannerState>((set) => ({
 
   clearPreview: () => set({ previewSlots: null }),
 
-  openSwapSheet: (slot) => set({ swapTargetSlot: slot }),
+  openSwapSheet: (slot, tab = 'library') => set({ swapTargetSlot: slot, swapSheetTab: tab }),
   closeSwapSheet: () => set({ swapTargetSlot: null }),
 
   openSlideOver: (recipe) => set({ slideOverRecipe: recipe }),

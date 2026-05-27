@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Recipe, MealType, Ingredient } from '@/types'
 import { createClient } from '@/lib/supabase/client'
@@ -35,6 +35,13 @@ export default function RecipeForm({ householdId, initial = {}, recipeId }: Reci
   const [sourceUrl, setSourceUrl] = useState(initial.source_url ?? '')
   const [photoUrl, setPhotoUrl] = useState(initial.photo_url ?? '')
   const [rating, setRating] = useState<number | null>(initial.rating ?? null)
+
+  // Sync photo URL when the parent's image picker selection changes after mount.
+  // Only fires when initial.photo_url is explicitly set (not undefined), so it
+  // never interferes with manual entry or the edit-recipe flow.
+  useEffect(() => {
+    if (initial.photo_url !== undefined) setPhotoUrl(initial.photo_url ?? '')
+  }, [initial.photo_url])
   const [notes, setNotes] = useState(initial.notes ?? '')
   const [tags, setTags] = useState(initial.tags?.join(', ') ?? '')
   const [saving, setSaving] = useState(false)

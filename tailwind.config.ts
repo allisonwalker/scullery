@@ -39,6 +39,7 @@ const config: Config = {
           '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto',
           '"Helvetica Neue"', 'Arial', 'sans-serif',
         ],
+        serif: ['var(--font-lora)', 'Georgia', 'serif'],
       },
       borderRadius: {
         DEFAULT: '0.375rem',

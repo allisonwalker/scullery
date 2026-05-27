@@ -177,9 +177,9 @@ export default function GroceryPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <NavBar />
-      <div className="flex-1 p-6 max-w-2xl mx-auto w-full">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-semibold text-gray-900">Grocery List</h1>
+      <div className="flex-1 p-4 pt-5 max-w-2xl mx-auto w-full">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-lg font-semibold text-gray-800">Grocery List</h1>
           <div className="flex gap-2">
             {list && (
               <button onClick={copyToClipboard} className="btn-secondary text-sm">
@@ -204,16 +204,16 @@ export default function GroceryPage() {
         )}
 
         {list && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {CATEGORY_ORDER.map((cat) => {
               const items = grouped[cat]
               if (!items.length) return null
               return (
                 <div key={cat}>
-                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2.5">
                     {CATEGORY_LABELS[cat]}
                   </h2>
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {items.map((item, idx) => {
                       const realIdx = list.items.indexOf(item)
                       const isEditing = editingIdx === realIdx
@@ -224,7 +224,7 @@ export default function GroceryPage() {
                         <div
                           key={idx}
                           className={cn(
-                            'flex items-center gap-3 px-3 py-2 rounded-lg group hover:bg-gray-50',
+                            'flex items-center gap-2.5 px-2.5 py-1 rounded-lg group hover:bg-gray-50',
                             item.checked && !isEditing && 'opacity-50',
                           )}
                         >
@@ -290,7 +290,7 @@ export default function GroceryPage() {
                               <div className="flex-1 min-w-0">
                                 <span
                                   className={cn(
-                                    'text-sm cursor-text',
+                                    'text-sm cursor-text leading-none',
                                     item.checked && 'line-through',
                                   )}
                                   onClick={() => !item.checked && startEdit(realIdx, item)}
@@ -299,17 +299,19 @@ export default function GroceryPage() {
                                   {item.name}
                                 </span>
                                 {recipeNames.length > 0 && (
-                                  <p className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity truncate mt-0.5">
-                                    {recipeNames.join(' · ')}
-                                  </p>
+                                  <div className="overflow-hidden max-h-0 group-hover:max-h-4 transition-all duration-150">
+                                    <p className="text-[11px] text-gray-400 truncate pt-0.5">
+                                      {recipeNames.join(' · ')}
+                                    </p>
+                                  </div>
                                 )}
                               </div>
-                              <span className="text-xs text-gray-400 shrink-0">
+                              <span className="text-xs text-gray-400 shrink-0 tabular-nums">
                                 {item.quantity} {item.unit}
                               </span>
                               <button
                                 onClick={() => removeItem(realIdx)}
-                                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-lg leading-none ml-1 shrink-0"
+                                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none shrink-0"
                                 title="Remove item"
                               >
                                 ×
@@ -326,15 +328,15 @@ export default function GroceryPage() {
 
             {/* Extra items */}
             <div>
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+              <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2.5">
                 Extra
               </h2>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {list.extra_items.map((item, idx) => (
                   <div
                     key={idx}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-lg group hover:bg-gray-50',
+                      'flex items-center gap-2.5 px-2.5 py-1 rounded-lg group hover:bg-gray-50',
                       item.checked && 'opacity-50',
                     )}
                   >
@@ -344,12 +346,12 @@ export default function GroceryPage() {
                       onChange={() => toggleExtra(idx)}
                       className="accent-brand-500 w-4 h-4 rounded cursor-pointer"
                     />
-                    <span className={cn('text-sm flex-1', item.checked && 'line-through')}>
+                    <span className={cn('text-sm flex-1 leading-none', item.checked && 'line-through')}>
                       {item.name}
                     </span>
                     <button
                       onClick={() => removeExtra(idx)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-lg leading-none"
+                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none"
                       title="Remove item"
                     >
                       ×
@@ -358,7 +360,7 @@ export default function GroceryPage() {
                 ))}
               </div>
 
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-2">
                 <input
                   type="text"
                   className="input flex-1"

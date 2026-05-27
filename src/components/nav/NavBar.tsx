@@ -2,16 +2,20 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import {
+  LayoutDashboard, CalendarDays, BookOpen,
+  ShoppingCart, Calendar, Settings, LogOut, ChefHat,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
-const NAV: { href: string; label: string; exact?: boolean }[] = [
-  { href: '/', label: 'Home', exact: true },
-  { href: '/planner', label: 'Planner' },
-  { href: '/recipes', label: 'Recipes' },
-  { href: '/grocery', label: 'Grocery' },
-  { href: '/plans', label: 'Plans' },
-  { href: '/settings', label: 'Settings' },
+const NAV: { href: string; label: string; icon: React.ReactNode; exact?: boolean }[] = [
+  { href: '/',         label: 'Home',     icon: <LayoutDashboard size={13} />, exact: true },
+  { href: '/planner',  label: 'Planner',  icon: <CalendarDays size={13} /> },
+  { href: '/recipes',  label: 'Recipes',  icon: <BookOpen size={13} /> },
+  { href: '/grocery',  label: 'Grocery',  icon: <ShoppingCart size={13} /> },
+  { href: '/plans',    label: 'Plans',    icon: <Calendar size={13} /> },
+  { href: '/settings', label: 'Settings', icon: <Settings size={13} /> },
 ]
 
 export default function NavBar() {
@@ -26,30 +30,49 @@ export default function NavBar() {
   }
 
   return (
-    <nav className="bg-white border-b border-gray-200 px-4 h-12 flex items-center justify-between">
-      <div className="flex items-center gap-6">
-        <Link href="/planner" className="flex items-center gap-2 font-semibold text-gray-900">
-          <span className="w-2.5 h-2.5 rounded-full bg-brand-500" />
-          Scullery
+    <nav className="bg-brand-900 px-5 h-14 flex items-center justify-between">
+
+      <div className="flex items-center gap-4">
+        {/* Logo */}
+        <Link href="/planner" className="flex items-center gap-2 shrink-0">
+          <ChefHat size={18} className="text-brand-400" />
+          <span className="font-serif italic font-semibold text-[22px] text-brand-100 tracking-tight leading-none">
+            scullery
+          </span>
         </Link>
-        <div className="flex items-center gap-1">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'px-3 py-1 rounded-md text-sm transition-colors',
-                (item.exact ? pathname === item.href : pathname.startsWith(item.href))
-                  ? 'bg-brand-50 text-brand-700 font-medium'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100',
-              )}
-            >
-              {item.label}
-            </Link>
-          ))}
+
+        {/* Separator */}
+        <div className="w-px h-6 bg-brand-700" />
+
+        {/* Nav links */}
+        <div className="flex items-center gap-0.5">
+          {NAV.map((item) => {
+            const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                  active
+                    ? 'bg-brand-700 text-white'
+                    : 'text-brand-300 hover:text-white hover:bg-brand-800',
+                )}
+              >
+                {item.icon}
+                {item.label}
+              </Link>
+            )
+          })}
         </div>
       </div>
-      <button onClick={signOut} className="text-sm text-gray-400 hover:text-gray-700 transition-colors">
+
+      {/* Sign out */}
+      <button
+        onClick={signOut}
+        className="flex items-center gap-1.5 text-xs text-brand-400 hover:text-white transition-colors"
+      >
+        <LogOut size={13} />
         Sign out
       </button>
     </nav>

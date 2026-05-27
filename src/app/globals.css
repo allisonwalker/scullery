@@ -10,7 +10,8 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900;
+    background-color: #f5f3ef;
+    @apply text-gray-900;
   }
 }
 

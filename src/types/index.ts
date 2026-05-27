@@ -48,6 +48,7 @@ export interface PlanConfig {
   snack: number
   library_ratio: number
   ingredients_to_use?: string[]
+  hidden_meal_types?: MealType[]
 }
 
 export interface WeeklyPlan {

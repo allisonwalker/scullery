@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation'
 import type { WeeklyPlan, PlanSlot, Recipe, MealType, AiRecipeSuggestion } from '@/types'
 import { usePlannerStore } from '@/store/plannerStore'
 import { createClient } from '@/lib/supabase/client'
-import { DAYS, dayDate, isTodayColumn, MEAL_TYPE_LABELS, cn, currentSeason } from '@/lib/utils'
+import { DAYS, MEAL_TYPE_LABELS, dayDate, isTodayColumn, cn, currentSeason } from '@/lib/utils'
+import { Lock, ShoppingCart, Sparkles, Sunrise, Sun, Moon, Leaf } from 'lucide-react'
 import MealCard from './MealCard'
 import SwapSheet from './SwapSheet'
 import RecipeSlideOver from './RecipeSlideOver'
 import SlideOver from '@/components/ui/SlideOver'
 import ConfigBar from './ConfigBar'
-import WeekNav from './WeekNav'
 import Link from 'next/link'
 
 interface PlannerGridProps {
@@ -25,6 +25,13 @@ interface PlannerGridProps {
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
+const MEAL_HEADER_ICONS: Record<MealType, React.ReactNode> = {
+  breakfast: <Sunrise size={12} />,
+  lunch:     <Sun size={12} />,
+  dinner:    <Moon size={12} />,
+  snack:     <Leaf size={12} />,
+}
+
 export default function PlannerGrid({
   plan,
   slots: initialSlots,
@@ -37,7 +44,6 @@ export default function PlannerGrid({
     slots, setSlots, config, setConfig,
     openSwapSheet, isRegenerating, setRegenerating,
     previewSlots, startPreview, acceptPreviewSlot, rejectPreviewSlot, clearPreview,
-    updateSlot, addSlot,
   } = usePlannerStore()
   const router = useRouter()
   const [promptText, setPromptText] = useState('')
@@ -48,36 +54,55 @@ export default function PlannerGrid({
     setConfig(plan.config)
   }, [plan.id])
 
-  // Group slots by day
-  const byDay: Record<number, PlanSlot[]> = {}
-  for (let d = 0; d < 7; d++) byDay[d] = []
-  for (const slot of slots) {
-    byDay[slot.day_of_week] = [...(byDay[slot.day_of_week] ?? []), slot]
+  // Group slots by day × meal type
+  const byDayType: Record<number, Record<MealType, PlanSlot[]>> = {}
+  for (let d = 0; d < 7; d++) {
+    byDayType[d] = { breakfast: [], lunch: [], dinner: [], snack: [] }
   }
+  for (const slot of slots) {
+    byDayType[slot.day_of_week][slot.meal_type as MealType].push(slot)
+  }
+
+  // Visible columns (respect hidden_meal_types from config)
+  const hiddenTypes = config.hidden_meal_types ?? []
+  const visibleMealOrder = MEAL_ORDER.filter((t) => !hiddenTypes.includes(t))
+  const gridCols = `88px repeat(${visibleMealOrder.length}, 1fr)`
+  // Cap each meal column at ~400 px so single-column views don't stretch absurdly wide.
+  // maxWidth = day-label(88) + gap-per-col(12) + col-cap(400) per visible column.
+  const gridMaxWidth = `${88 + visibleMealOrder.length * 412}px`
 
   const totalMeals = slots.filter((s) => s.recipe_id).length
   const lockedCount = slots.filter((s) => s.is_locked).length
   const newCount = slots.filter((s) => (s.recipe as Recipe | null)?.is_from_library === false).length
+
+  function handleAddMeal(dayIdx: number, mealType: MealType) {
+    openSwapSheet({
+      id: `new-${Date.now()}`,
+      plan_id: plan.id,
+      day_of_week: dayIdx,
+      meal_type: mealType,
+      recipe_id: null,
+      is_locked: false,
+      sort_order: 99,
+      recipe: null,
+    }, 'library')
+  }
 
   async function regenerate() {
     if (isRegenerating) return
     setRegenerating(true)
     const supabase = createClient()
 
-    // Determine how many slots of each type to create
     const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
     const lockedSlots = slots.filter((s) => s.is_locked)
 
-    // Count locked slots per type
     const lockedPerType: Record<MealType, number> = { breakfast: 0, lunch: 0, dinner: 0, snack: 0 }
     for (const s of lockedSlots) lockedPerType[s.meal_type]++
 
-    // Build new unlocked slots distributed across days
     const newSlots: Omit<PlanSlot, 'id' | 'recipe'>[] = []
     for (const type of MEAL_TYPES) {
       const total = config[type]
       const needed = Math.max(0, total - lockedPerType[type])
-      // Distribute evenly: pick days not already locked for this type
       const lockedDays = new Set(lockedSlots.filter((s) => s.meal_type === type).map((s) => s.day_of_week))
       const freeDays = [0,1,2,3,4,5,6].filter((d) => !lockedDays.has(d))
       for (let i = 0; i < Math.min(needed, freeDays.length); i++) {
@@ -92,17 +117,12 @@ export default function PlannerGrid({
       }
     }
 
-    // Split by library vs AI
     const libraryCount = Math.round(newSlots.length * config.library_ratio)
-    const aiCount = newSlots.length - libraryCount
-
-    // Fetch library recipes
     const librarySlots = newSlots.slice(0, libraryCount)
     const aiSlots = newSlots.slice(libraryCount)
 
     const filledSlots: PlanSlot[] = [...lockedSlots]
 
-    // Fill library slots
     for (const slot of librarySlots) {
       const { data: candidates } = await supabase
         .from('recipes')
@@ -119,7 +139,6 @@ export default function PlannerGrid({
       }
     }
 
-    // Fill AI slots
     if (aiSlots.length > 0) {
       const grouped: Partial<Record<MealType, number>> = {}
       for (const s of aiSlots) grouped[s.meal_type] = (grouped[s.meal_type] ?? 0) + 1
@@ -158,7 +177,6 @@ export default function PlannerGrid({
             preview_status: 'pending',
           } as unknown as PlanSlot)
         } else {
-          // AI suggestion unavailable — fall back to a library recipe
           const { data: candidates } = await supabase
             .from('recipes')
             .select('*')
@@ -182,7 +200,6 @@ export default function PlannerGrid({
     if (!previewSlots) return
     const supabase = createClient()
 
-    // Delete all existing unlocked slots
     const unlocked = slots.filter((s) => !s.is_locked)
     if (unlocked.length > 0) {
       await supabase.from('plan_slots').delete().in('id', unlocked.map((s) => s.id))
@@ -190,12 +207,10 @@ export default function PlannerGrid({
 
     const accepted = previewSlots.filter((s) => (s as never as { preview_status: string }).preview_status !== 'rejected')
 
-    // For AI suggested slots, create recipe first
     const finalSlots: PlanSlot[] = []
     for (const preview of accepted) {
       const p = preview as never as { preview_status: string; suggested_recipe?: AiRecipeSuggestion }
       if (preview.recipe_id) {
-        // Library recipe — insert slot
         const { data } = await supabase.from('plan_slots').insert({
           plan_id: plan.id,
           day_of_week: preview.day_of_week,
@@ -206,7 +221,6 @@ export default function PlannerGrid({
         }).select().single()
         if (data) finalSlots.push({ ...data, recipe: preview.recipe })
       } else if (p.suggested_recipe) {
-        // AI recipe — persist recipe then slot
         const { data: recipeData } = await supabase.from('recipes').insert({
           household_id: householdId,
           title: p.suggested_recipe.title,
@@ -238,25 +252,27 @@ export default function PlannerGrid({
     router.refresh()
   }
 
-  function addEmptySlot(day: number, type: MealType) {
-    const placeholder: PlanSlot = {
-      id: `new-${Date.now()}`,
-      plan_id: plan.id,
-      day_of_week: day,
-      meal_type: type,
-      recipe_id: null,
-      is_locked: false,
-      sort_order: 99,
-      recipe: null,
-    }
-    openSwapSheet(placeholder)
-  }
-
-  // Preview mode overlay
+  // ── Preview mode ────────────────────────────────────────────────────────────
   if (previewSlots) {
+    const hiddenTypes = config.hidden_meal_types ?? []
+    const visibleMealOrder = MEAL_ORDER.filter((t) => !hiddenTypes.includes(t))
+    const gridCols = `88px repeat(${visibleMealOrder.length}, 1fr)`
+  // Cap each meal column at ~400 px so single-column views don't stretch absurdly wide.
+  // maxWidth = day-label(88) + gap-per-col(12) + col-cap(400) per visible column.
+  const gridMaxWidth = `${88 + visibleMealOrder.length * 412}px`
+
+    const previewByDayType: Record<number, Record<MealType, typeof previewSlots>> = {}
+    for (let d = 0; d < 7; d++) {
+      previewByDayType[d] = { breakfast: [], lunch: [], dinner: [], snack: [] }
+    }
+    for (const slot of previewSlots) {
+      previewByDayType[slot.day_of_week][slot.meal_type as MealType].push(slot)
+    }
+
     return (
       <div className="flex-1 overflow-auto">
-        <div className="bg-purple-50 border-b border-purple-200 px-4 py-3 flex items-center justify-between">
+        {/* Preview banner */}
+        <div className="bg-purple-50 border-b border-purple-200 px-5 py-3 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-purple-900">Review new plan suggestions</p>
             <p className="text-xs text-purple-600 mt-0.5">Accept or reject each suggestion, then commit.</p>
@@ -267,61 +283,97 @@ export default function PlannerGrid({
           </div>
         </div>
 
-        <div className="p-4 grid grid-cols-7 gap-3">
-          {DAYS.map((day, dayIdx) => {
-            const daySlots = previewSlots.filter((s) => s.day_of_week === dayIdx)
-            const isToday = isTodayColumn(weekStart, dayIdx)
-            return (
-              <div key={dayIdx} className={cn('space-y-2', isToday && 'bg-brand-50/50 rounded-xl p-2 -m-2')}>
-                <div className="text-center">
-                  <p className="text-xs font-medium text-gray-500">{day}</p>
-                  <p className="text-sm font-semibold text-gray-900">{dayDate(weekStart, dayIdx).getDate()}</p>
-                </div>
-                {daySlots.map((slot) => {
-                  const p = slot as never as { preview_status: string; suggested_recipe?: AiRecipeSuggestion }
-                  const recipe = slot.recipe as Recipe | null
-                  const name = recipe?.title ?? p.suggested_recipe?.title ?? '—'
-                  const isRejected = p.preview_status === 'rejected'
-                  const isLocked = slot.is_locked
-
-                  return (
-                    <div key={slot.id} className={cn('card px-3 py-2.5', isRejected && 'opacity-40')}>
-                      <p className="text-xs text-gray-500 mb-1">{MEAL_TYPE_LABELS[slot.meal_type]}</p>
-                      <p className="text-sm font-medium text-gray-900 line-clamp-2">{name}</p>
-                      {!isLocked && (
-                        <div className="flex gap-2 mt-2">
-                          {p.suggested_recipe && (
-                            <button
-                              onClick={() => setPreviewSuggestion(p.suggested_recipe!)}
-                              className="text-xs text-gray-400 hover:text-gray-700 underline"
-                            >
-                              View
-                            </button>
-                          )}
-                          {!isRejected ? (
-                            <button
-                              onClick={() => rejectPreviewSlot(slot.id)}
-                              className="text-xs text-red-500 hover:text-red-700"
-                            >
-                              Reject
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => acceptPreviewSlot(slot.id)}
-                              className="text-xs text-brand-600 hover:text-brand-800"
-                            >
-                              Restore
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      {isLocked && <p className="text-xs text-amber-600 mt-1">🔒 locked</p>}
-                    </div>
-                  )
-                })}
+        <div className="p-5">
+          {/* Column headers */}
+          <div className="grid gap-3 mb-2 px-2" style={{ gridTemplateColumns: gridCols }}>
+            <div />
+            {visibleMealOrder.map((type) => (
+              <div key={type} className="flex items-center justify-center gap-1.5 py-1">
+                <span className="text-brand-400/70">{MEAL_HEADER_ICONS[type]}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-600/70">
+                  {MEAL_TYPE_LABELS[type]}
+                </span>
               </div>
-            )
-          })}
+            ))}
+          </div>
+
+          {/* Day rows */}
+          <div className="space-y-2">
+            {DAYS.map((day, dayIdx) => {
+              const isToday = isTodayColumn(weekStart, dayIdx)
+              const date = dayDate(weekStart, dayIdx)
+              return (
+                <div
+                  key={dayIdx}
+                  className={cn(
+                    'grid gap-3 p-2 rounded-xl',
+                    isToday ? 'bg-brand-50/80 ring-1 ring-brand-200/50' : 'hover:bg-black/[0.02]',
+                  )}
+                  style={{ gridTemplateColumns: gridCols }}
+                >
+                  <div className="flex flex-col justify-center py-1">
+                    <p className={cn('text-sm font-semibold', isToday ? 'text-brand-600' : 'text-gray-700')}>{day}</p>
+                    <p className="text-xs text-gray-400">{date.getDate()}</p>
+                  </div>
+
+                  {visibleMealOrder.map((mealType) => {
+                    const cellSlots = previewByDayType[dayIdx][mealType]
+                    if (cellSlots.length === 0) return <div key={mealType} />
+
+                    return (
+                      <div key={mealType} className="space-y-1.5">
+                        {cellSlots.map((slot) => {
+                          const p = slot as never as { preview_status: string; suggested_recipe?: AiRecipeSuggestion }
+                          const recipe = slot.recipe as Recipe | null
+                          const name = recipe?.title ?? p.suggested_recipe?.title ?? '—'
+                          const isRejected = p.preview_status === 'rejected'
+                          const isLocked = slot.is_locked
+
+                          return (
+                            <div key={slot.id} className={cn('card px-3 py-2.5', isRejected && 'opacity-40')}>
+                              <p className="text-xs font-medium text-gray-900 line-clamp-2 leading-snug">{name}</p>
+                              {!isLocked && (
+                                <div className="flex gap-2 mt-1.5">
+                                  {p.suggested_recipe && (
+                                    <button
+                                      onClick={() => setPreviewSuggestion(p.suggested_recipe!)}
+                                      className="text-xs text-gray-400 hover:text-gray-700 underline"
+                                    >
+                                      View
+                                    </button>
+                                  )}
+                                  {!isRejected ? (
+                                    <button
+                                      onClick={() => rejectPreviewSlot(slot.id)}
+                                      className="text-xs text-red-500 hover:text-red-700"
+                                    >
+                                      Reject
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => acceptPreviewSlot(slot.id)}
+                                      className="text-xs text-brand-600 hover:text-brand-800"
+                                    >
+                                      Restore
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {isLocked && (
+                                <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
+                                  <Lock size={9} /> locked
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         {/* AI suggestion detail slide-over */}
@@ -341,11 +393,9 @@ export default function PlannerGrid({
                   <span className="text-sm text-gray-500">⏱ {previewSuggestion.cook_time_minutes} min</span>
                 )}
               </div>
-
               {previewSuggestion.description && (
                 <p className="text-sm text-gray-600">{previewSuggestion.description}</p>
               )}
-
               {previewSuggestion.ingredients.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">Ingredients</h3>
@@ -361,7 +411,6 @@ export default function PlannerGrid({
                   </ul>
                 </div>
               )}
-
               {previewSuggestion.source_url && (
                 <a
                   href={previewSuggestion.source_url}
@@ -379,92 +428,129 @@ export default function PlannerGrid({
     )
   }
 
+  // ── Normal mode ─────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex items-center justify-between">
-        <WeekNav weekStart={weekStart} />
-        <div className="flex items-center gap-2">
-          <Link href="/settings" className="btn-ghost">⚙</Link>
-          <span className="text-xs text-gray-400 whitespace-nowrap">New recipes:</span>
-          <input
-            type="text"
-            value={promptText}
-            onChange={(e) => setPromptText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && regenerate()}
-            placeholder="e.g. quick Asian meals"
-            className="input text-sm w-44"
-            title="Guides AI suggestions only — does not affect library recipes"
-          />
-          <button
-            onClick={regenerate}
-            disabled={isRegenerating}
-            className="btn-primary"
-          >
-            {isRegenerating ? 'Generating…' : '↺ Regenerate plan'}
-          </button>
-        </div>
-      </div>
 
-      <ConfigBar planId={plan.id} />
+      <ConfigBar
+        planId={plan.id}
+        weekStart={weekStart}
+        promptText={promptText}
+        onPromptChange={setPromptText}
+        onRegenerate={regenerate}
+        isRegenerating={isRegenerating}
+      />
 
       {/* Grid */}
-      <div className="flex-1 overflow-auto p-4">
-        <div className="grid grid-cols-7 gap-3 min-w-[700px]">
-          {DAYS.map((day, dayIdx) => {
-            const isToday = isTodayColumn(weekStart, dayIdx)
-            const daySlots = (byDay[dayIdx] ?? []).sort((a, b) => {
-              const ao = MEAL_ORDER.indexOf(a.meal_type)
-              const bo = MEAL_ORDER.indexOf(b.meal_type)
-              return ao - bo
-            })
+      <div className="flex-1 overflow-auto p-5">
 
-            return (
-              <div
-                key={dayIdx}
-                className={cn(
-                  'space-y-2',
-                  isToday && 'bg-brand-50/50 rounded-xl p-2 -m-2',
-                )}
-              >
-                {/* Day header */}
-                <div className="text-center pb-1">
-                  <p className="text-xs font-medium text-gray-500">{day}</p>
-                  <p className={cn('text-sm font-semibold', isToday ? 'text-brand-600' : 'text-gray-900')}>
-                    {dayDate(weekStart, dayIdx).getDate()}
-                  </p>
+        {visibleMealOrder.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <p className="text-sm font-medium text-gray-400">All columns hidden</p>
+            <p className="text-xs text-gray-400 mt-1">Use the controls above to show meal type columns.</p>
+          </div>
+        ) : (
+          <div style={{ maxWidth: gridMaxWidth }}>
+            {/* Column headers */}
+            <div className="grid gap-3 mb-1 px-2" style={{ gridTemplateColumns: gridCols }}>
+              <div /> {/* corner */}
+              {visibleMealOrder.map((type) => (
+                <div key={type} className="flex items-center justify-center gap-1.5 py-1.5">
+                  <span className="text-brand-400/80">{MEAL_HEADER_ICONS[type]}</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-600/80">
+                    {MEAL_TYPE_LABELS[type]}
+                  </span>
                 </div>
+              ))}
+            </div>
 
-                {daySlots.map((slot) => (
-                  <MealCard key={slot.id} slot={slot} />
-                ))}
+            {/* Day rows */}
+            <div className="space-y-2">
+              {DAYS.map((day, dayIdx) => {
+                const isToday = isTodayColumn(weekStart, dayIdx)
+                const date = dayDate(weekStart, dayIdx)
 
-                {/* Add meal button */}
-                <button
-                  onClick={() => addEmptySlot(dayIdx, 'dinner')}
-                  className="w-full border border-dashed border-gray-200 rounded-lg py-2 text-xs text-gray-400 hover:border-brand-300 hover:text-brand-500 transition-colors"
-                >
-                  + Add meal
-                </button>
-              </div>
-            )
-          })}
-        </div>
+                return (
+                  <div
+                    key={dayIdx}
+                    className={cn(
+                      'grid gap-3 p-2 rounded-xl transition-colors',
+                      isToday
+                        ? 'bg-brand-50/80 ring-1 ring-brand-200/50'
+                        : 'hover:bg-black/[0.015]',
+                    )}
+                    style={{ gridTemplateColumns: gridCols }}
+                  >
+                    {/* Day label */}
+                    <div className="flex flex-col justify-center py-1">
+                      <p className={cn(
+                        'text-sm font-bold leading-tight',
+                        isToday ? 'text-brand-600' : 'text-gray-700',
+                      )}>
+                        {day}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+
+                    {/* Meal type cells (only visible columns) */}
+                    {visibleMealOrder.map((mealType) => {
+                      const cellSlots = byDayType[dayIdx][mealType]
+
+                      return (
+                        <div key={mealType} className="group space-y-1.5">
+                          {cellSlots.map((slot) => (
+                            <MealCard key={slot.id} slot={slot} />
+                          ))}
+
+                          {/* Add button */}
+                          {cellSlots.length === 0 ? (
+                            <button
+                              onClick={() => handleAddMeal(dayIdx, mealType)}
+                              className="w-full border border-dashed border-gray-200 rounded-lg py-3 text-xs
+                                         text-gray-300 hover:border-brand-300 hover:text-brand-500 transition-colors"
+                            >
+                              +
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleAddMeal(dayIdx, mealType)}
+                              className="w-full text-xs text-gray-300 opacity-0 group-hover:opacity-100
+                                         hover:text-brand-400 py-0.5 transition-all text-center"
+                            >
+                              + add
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Bottom bar */}
-      <div className="bg-white border-t border-gray-200 px-4 py-2.5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">{totalMeals} meals planned</span>
+      {/* Bottom status bar */}
+      <div className="bg-brand-900 border-t border-brand-800 px-5 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-brand-300">{totalMeals} meals planned</span>
           {lockedCount > 0 && (
-            <span className="text-sm text-amber-600">· {lockedCount} locked</span>
+            <span className="flex items-center gap-1 text-xs text-amber-400">
+              <Lock size={10} /> {lockedCount} locked
+            </span>
           )}
           {newCount > 0 && (
-            <span className="text-sm text-purple-600">· {newCount} new</span>
+            <span className="flex items-center gap-1 text-xs text-purple-300">
+              <Sparkles size={10} /> {newCount} new
+            </span>
           )}
         </div>
-        <Link href="/grocery" className="btn-secondary text-sm">
-          View grocery list →
+        <Link href="/grocery" className="flex items-center gap-1.5 text-xs font-medium text-brand-200 hover:text-white transition-colors">
+          <ShoppingCart size={13} />
+          Grocery list
         </Link>
       </div>
 
