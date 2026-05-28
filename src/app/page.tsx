@@ -28,9 +28,10 @@ export default async function HomePage() {
   let recipeCount = 0
   let hasPlan = false
   let hasGroceryList = false
+  let householdName: string | null = null
 
   if (householdId) {
-    const [recipesRes, planRes] = await Promise.all([
+    const [recipesRes, planRes, householdRes] = await Promise.all([
       supabase
         .from('recipes')
         .select('id', { count: 'exact', head: true })
@@ -42,10 +43,16 @@ export default async function HomePage() {
         .eq('household_id', householdId)
         .eq('week_start', weekStart)
         .single(),
+      supabase
+        .from('households')
+        .select('name')
+        .eq('id', householdId)
+        .single(),
     ])
 
     recipeCount = recipesRes.count ?? 0
     hasPlan = !!planRes.data
+    householdName = householdRes.data?.name ?? null
 
     if (planRes.data) {
       const groceryRes = await supabase
@@ -119,6 +126,11 @@ export default async function HomePage() {
 
         {/* Greeting */}
         <div className="mb-8 mt-4">
+          {householdName && (
+            <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-2">
+              {householdName}
+            </p>
+          )}
           <h1 className="font-serif italic text-3xl text-gray-800 leading-tight">
             {greeting}, {firstName}
           </h1>

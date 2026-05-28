@@ -1,10 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, CalendarDays, BookOpen,
-  ShoppingCart, Calendar, Settings, LogOut, ChefHat,
+  ShoppingCart, Calendar, Settings, LogOut, ChefHat, Users,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,28 @@ const NAV: { href: string; label: string; icon: React.ReactNode; exact?: boolean
 export default function NavBar() {
   const pathname = usePathname()
   const router = useRouter()
+  const [householdName, setHouseholdName] = useState<string | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    async function loadHousehold() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('household_id')
+        .eq('id', user.id)
+        .single()
+      if (!profile?.household_id) return
+      const { data: hh } = await supabase
+        .from('households')
+        .select('name')
+        .eq('id', profile.household_id)
+        .single()
+      if (hh?.name) setHouseholdName(hh.name)
+    }
+    loadHousehold()
+  }, [])
 
   async function signOut() {
     const supabase = createClient()
@@ -32,7 +55,7 @@ export default function NavBar() {
   return (
     <nav className="bg-brand-900 px-5 h-14 flex items-center justify-between">
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {/* Logo */}
         <Link href="/planner" className="flex items-center gap-2 shrink-0">
           <ChefHat size={18} className="text-brand-400" />
@@ -41,8 +64,21 @@ export default function NavBar() {
           </span>
         </Link>
 
+        {/* Household name — sits between logo and nav tabs */}
+        {householdName && (
+          <>
+            <div className="w-px h-5 bg-brand-700" />
+            <div className="flex items-center gap-1.5 bg-brand-800 rounded-lg px-2.5 py-1">
+              <Users size={11} className="text-brand-500" />
+              <span className="text-[11px] font-semibold text-brand-300 tracking-wide">
+                {householdName}
+              </span>
+            </div>
+          </>
+        )}
+
         {/* Separator */}
-        <div className="w-px h-6 bg-brand-700" />
+        <div className="w-px h-5 bg-brand-700" />
 
         {/* Nav links */}
         <div className="flex items-center gap-0.5">
