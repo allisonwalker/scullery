@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const linkExpired = searchParams.get('error') === 'link_expired'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -41,6 +43,11 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="card p-6 space-y-4">
+          {linkExpired && (
+            <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+              That link has expired. Request a new one using the forgot password flow, or sign in with your password below.
+            </p>
+          )}
           {error && (
             <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
           )}
