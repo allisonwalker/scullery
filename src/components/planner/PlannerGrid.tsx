@@ -70,6 +70,8 @@ export default function PlannerGrid({
   // Cap each meal column at ~400 px so single-column views don't stretch absurdly wide.
   // maxWidth = day-label(88) + gap-per-col(12) + col-cap(400) per visible column.
   const gridMaxWidth = `${88 + visibleMealOrder.length * 412}px`
+  // Minimum width keeps columns readable on mobile; triggers horizontal scroll instead of squishing.
+  const gridMinWidth = `${88 + visibleMealOrder.length * 180}px`
 
   const totalMeals = slots.filter((s) => s.recipe_id).length
   const lockedCount = slots.filter((s) => s.is_locked).length
@@ -257,9 +259,8 @@ export default function PlannerGrid({
     const hiddenTypes = config.hidden_meal_types ?? []
     const visibleMealOrder = MEAL_ORDER.filter((t) => !hiddenTypes.includes(t))
     const gridCols = `88px repeat(${visibleMealOrder.length}, 1fr)`
-  // Cap each meal column at ~400 px so single-column views don't stretch absurdly wide.
-  // maxWidth = day-label(88) + gap-per-col(12) + col-cap(400) per visible column.
-  const gridMaxWidth = `${88 + visibleMealOrder.length * 412}px`
+    const gridMaxWidth = `${88 + visibleMealOrder.length * 412}px`
+    const gridMinWidth = `${88 + visibleMealOrder.length * 180}px`
 
     const previewByDayType: Record<number, Record<MealType, typeof previewSlots>> = {}
     for (let d = 0; d < 7; d++) {
@@ -284,6 +285,7 @@ export default function PlannerGrid({
         </div>
 
         <div className="p-5">
+          <div style={{ minWidth: gridMinWidth }}>
           {/* Column headers */}
           <div className="grid gap-3 mb-2 px-2" style={{ gridTemplateColumns: gridCols }}>
             <div />
@@ -374,6 +376,7 @@ export default function PlannerGrid({
               )
             })}
           </div>
+          </div>{/* end minWidth wrapper */}
         </div>
 
         {/* AI suggestion detail slide-over */}
@@ -450,7 +453,7 @@ export default function PlannerGrid({
             <p className="text-xs text-gray-400 mt-1">Use the controls above to show meal type columns.</p>
           </div>
         ) : (
-          <div style={{ maxWidth: gridMaxWidth }}>
+          <div style={{ maxWidth: gridMaxWidth, minWidth: gridMinWidth }}>
             {/* Column headers */}
             <div className="grid gap-3 mb-1 px-2" style={{ gridTemplateColumns: gridCols }}>
               <div /> {/* corner */}
