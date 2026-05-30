@@ -56,7 +56,8 @@ grant execute on function get_invitation_details(text) to anon, authenticated;
 -- ─── Updated handle_new_user: join existing household if invited ──────────────
 
 create or replace function handle_new_user()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer
+set search_path = public as $$
 declare
   new_household_id  uuid;
   pending_invite    record;
