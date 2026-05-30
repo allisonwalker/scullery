@@ -154,7 +154,7 @@ export function OnboardingTour() {
         close: 'Close',
         last: 'Done',
         next: 'Next',
-        nextWithProgress: 'Next ({step} of {steps})',
+        nextWithProgress: 'Next ({current} of {total})',
         skip: 'Skip tour',
       }}
     />
