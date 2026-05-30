@@ -6,7 +6,7 @@ import type { WeeklyPlan, PlanSlot, Recipe, MealType, AiRecipeSuggestion } from 
 import { usePlannerStore } from '@/store/plannerStore'
 import { createClient } from '@/lib/supabase/client'
 import { DAYS, MEAL_TYPE_LABELS, dayDate, isTodayColumn, cn, currentSeason } from '@/lib/utils'
-import { Lock, ShoppingCart, Sparkles, Sunrise, Sun, Moon, Leaf } from 'lucide-react'
+import { Lock, ShoppingCart, Sparkles, Sunrise, Sun, Moon, Leaf, ChevronDown } from 'lucide-react'
 import MealCard from './MealCard'
 import SwapSheet from './SwapSheet'
 import RecipeSlideOver from './RecipeSlideOver'
@@ -48,6 +48,22 @@ export default function PlannerGrid({
   const router = useRouter()
   const [promptText, setPromptText] = useState('')
   const [previewSuggestion, setPreviewSuggestion] = useState<AiRecipeSuggestion | null>(null)
+
+  // Mobile accordion: which days are expanded (default: today)
+  const [expandedDays, setExpandedDays] = useState<Set<number>>(() => {
+    for (let i = 0; i < 7; i++) {
+      if (isTodayColumn(weekStart, i)) return new Set([i])
+    }
+    return new Set([0])
+  })
+  function toggleDay(dayIdx: number) {
+    setExpandedDays((prev) => {
+      const next = new Set(prev)
+      if (next.has(dayIdx)) next.delete(dayIdx)
+      else next.add(dayIdx)
+      return next
+    })
+  }
 
   useEffect(() => {
     setSlots(initialSlots)
@@ -453,86 +469,163 @@ export default function PlannerGrid({
             <p className="text-xs text-gray-400 mt-1">Use the controls above to show meal type columns.</p>
           </div>
         ) : (
-          <div style={{ maxWidth: gridMaxWidth, minWidth: gridMinWidth }}>
-            {/* Column headers */}
-            <div className="grid gap-3 mb-1 px-2" style={{ gridTemplateColumns: gridCols }}>
-              <div /> {/* corner */}
-              {visibleMealOrder.map((type) => (
-                <div key={type} className="flex items-center justify-center gap-1.5 py-1.5">
-                  <span className="text-brand-400/80">{MEAL_HEADER_ICONS[type]}</span>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-600/80">
-                    {MEAL_TYPE_LABELS[type]}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Day rows */}
-            <div className="space-y-2">
+          <>
+            {/* ── Mobile accordion (hidden on sm+) ─────────────────────────── */}
+            <div className="sm:hidden space-y-2">
               {DAYS.map((day, dayIdx) => {
                 const isToday = isTodayColumn(weekStart, dayIdx)
                 const date = dayDate(weekStart, dayIdx)
+                const isExpanded = expandedDays.has(dayIdx)
+                const mealCount = visibleMealOrder.reduce(
+                  (n, t) => n + byDayType[dayIdx][t].filter((s) => s.recipe_id).length, 0
+                )
 
                 return (
                   <div
                     key={dayIdx}
                     className={cn(
-                      'grid gap-3 p-2 rounded-xl transition-colors',
-                      isToday
-                        ? 'bg-brand-50/80 ring-1 ring-brand-200/50'
-                        : 'hover:bg-black/[0.015]',
+                      'rounded-xl overflow-hidden border',
+                      isToday ? 'border-brand-200 ring-1 ring-brand-200/50' : 'border-gray-100',
                     )}
-                    style={{ gridTemplateColumns: gridCols }}
                   >
-                    {/* Day label */}
-                    <div className="flex flex-col justify-center py-1">
-                      <p className={cn(
-                        'text-sm font-bold leading-tight',
-                        isToday ? 'text-brand-600' : 'text-gray-700',
-                      )}>
-                        {day}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </p>
-                    </div>
-
-                    {/* Meal type cells (only visible columns) */}
-                    {visibleMealOrder.map((mealType) => {
-                      const cellSlots = byDayType[dayIdx][mealType]
-
-                      return (
-                        <div key={mealType} className="group space-y-1.5">
-                          {cellSlots.map((slot) => (
-                            <MealCard key={slot.id} slot={slot} />
-                          ))}
-
-                          {/* Add button */}
-                          {cellSlots.length === 0 ? (
-                            <button
-                              onClick={() => handleAddMeal(dayIdx, mealType)}
-                              className="w-full border border-dashed border-gray-200 rounded-lg py-3 text-xs
-                                         text-gray-300 hover:border-brand-300 hover:text-brand-500 transition-colors"
-                            >
-                              +
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleAddMeal(dayIdx, mealType)}
-                              className="w-full text-xs text-gray-300 opacity-0 group-hover:opacity-100
-                                         hover:text-brand-400 py-0.5 transition-all text-center"
-                            >
-                              + add
-                            </button>
-                          )}
+                    {/* Day header — tap to toggle */}
+                    <button
+                      onClick={() => toggleDay(dayIdx)}
+                      className={cn(
+                        'w-full flex items-center justify-between px-4 py-3 text-left',
+                        isToday ? 'bg-brand-50/80' : 'bg-white',
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <p className={cn('text-sm font-bold leading-tight', isToday ? 'text-brand-600' : 'text-gray-700')}>
+                            {day}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </p>
                         </div>
-                      )
-                    })}
+                        {mealCount > 0 && (
+                          <span className="text-xs text-gray-400">
+                            {mealCount} meal{mealCount !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <ChevronDown
+                        size={16}
+                        className={cn('text-gray-300 transition-transform duration-200 shrink-0', isExpanded && 'rotate-180')}
+                      />
+                    </button>
+
+                    {/* Expanded: meal type sections */}
+                    {isExpanded && (
+                      <div className="bg-white divide-y divide-gray-50 border-t border-gray-100">
+                        {visibleMealOrder.map((mealType) => {
+                          const cellSlots = byDayType[dayIdx][mealType]
+                          return (
+                            <div key={mealType} className="px-4 py-3">
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <span className="text-brand-400/70">{MEAL_HEADER_ICONS[mealType]}</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-600/70">
+                                  {MEAL_TYPE_LABELS[mealType]}
+                                </span>
+                              </div>
+                              <div className="space-y-1.5">
+                                {cellSlots.map((slot) => (
+                                  <MealCard key={slot.id} slot={slot} />
+                                ))}
+                                <button
+                                  onClick={() => handleAddMeal(dayIdx, mealType)}
+                                  className="w-full border border-dashed border-gray-200 rounded-lg py-2 text-xs
+                                             text-gray-300 hover:border-brand-300 hover:text-brand-500 transition-colors"
+                                >
+                                  + add
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )
               })}
             </div>
-          </div>
+
+            {/* ── Desktop grid (hidden on mobile) ──────────────────────────── */}
+            <div className="hidden sm:block" style={{ maxWidth: gridMaxWidth, minWidth: gridMinWidth }}>
+              {/* Column headers */}
+              <div className="grid gap-3 mb-1 px-2" style={{ gridTemplateColumns: gridCols }}>
+                <div /> {/* corner */}
+                {visibleMealOrder.map((type) => (
+                  <div key={type} className="flex items-center justify-center gap-1.5 py-1.5">
+                    <span className="text-brand-400/80">{MEAL_HEADER_ICONS[type]}</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-600/80">
+                      {MEAL_TYPE_LABELS[type]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Day rows */}
+              <div className="space-y-2">
+                {DAYS.map((day, dayIdx) => {
+                  const isToday = isTodayColumn(weekStart, dayIdx)
+                  const date = dayDate(weekStart, dayIdx)
+
+                  return (
+                    <div
+                      key={dayIdx}
+                      className={cn(
+                        'grid gap-3 p-2 rounded-xl transition-colors',
+                        isToday ? 'bg-brand-50/80 ring-1 ring-brand-200/50' : 'hover:bg-black/[0.015]',
+                      )}
+                      style={{ gridTemplateColumns: gridCols }}
+                    >
+                      {/* Day label */}
+                      <div className="flex flex-col justify-center py-1">
+                        <p className={cn('text-sm font-bold leading-tight', isToday ? 'text-brand-600' : 'text-gray-700')}>
+                          {day}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </p>
+                      </div>
+
+                      {/* Meal type cells */}
+                      {visibleMealOrder.map((mealType) => {
+                        const cellSlots = byDayType[dayIdx][mealType]
+                        return (
+                          <div key={mealType} className="group space-y-1.5">
+                            {cellSlots.map((slot) => (
+                              <MealCard key={slot.id} slot={slot} />
+                            ))}
+                            {cellSlots.length === 0 ? (
+                              <button
+                                onClick={() => handleAddMeal(dayIdx, mealType)}
+                                className="w-full border border-dashed border-gray-200 rounded-lg py-3 text-xs
+                                           text-gray-300 hover:border-brand-300 hover:text-brand-500 transition-colors"
+                              >
+                                +
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleAddMeal(dayIdx, mealType)}
+                                className="w-full text-xs text-gray-300 opacity-0 group-hover:opacity-100
+                                           hover:text-brand-400 py-0.5 transition-all text-center"
+                              >
+                                + add
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </>
         )}
       </div>
 
