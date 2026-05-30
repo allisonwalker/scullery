@@ -7,6 +7,7 @@ import {
   CalendarDays, ShoppingCart, BookOpen,
   Calendar, Settings, ChevronRight,
 } from 'lucide-react'
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour'
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -71,6 +72,7 @@ export default async function HomePage() {
   const tiles = [
     {
       href: `/planner/${weekStart}`,
+      tourId: 'tile-planner',
       Icon: CalendarDays,
       iconBg: 'bg-brand-100',
       iconColor: 'text-brand-600',
@@ -80,6 +82,7 @@ export default async function HomePage() {
     },
     {
       href: '/grocery',
+      tourId: 'tile-grocery',
       Icon: ShoppingCart,
       iconBg: 'bg-brand-100',
       iconColor: 'text-brand-500',
@@ -89,6 +92,7 @@ export default async function HomePage() {
     },
     {
       href: '/recipes',
+      tourId: 'tile-recipes',
       Icon: BookOpen,
       iconBg: 'bg-brand-100',
       iconColor: 'text-brand-600',
@@ -100,6 +104,7 @@ export default async function HomePage() {
     },
     {
       href: '/plans',
+      tourId: 'tile-plans',
       Icon: Calendar,
       iconBg: 'bg-brand-100',
       iconColor: 'text-brand-500',
@@ -109,6 +114,7 @@ export default async function HomePage() {
     },
     {
       href: '/settings',
+      tourId: 'tile-settings',
       Icon: Settings,
       iconBg: 'bg-brand-100',
       iconColor: 'text-brand-400',
@@ -145,6 +151,7 @@ export default async function HomePage() {
               <Link
                 key={tile.href}
                 href={tile.href}
+                data-tour={tile.tourId}
                 className="card px-5 py-4 flex items-center gap-4 transition-all
                            hover:border-brand-300 hover:bg-brand-50/60 hover:shadow-sm group"
               >
@@ -176,6 +183,8 @@ export default async function HomePage() {
           })}
         </div>
       </div>
+
+      <OnboardingTour />
     </div>
   )
 }
