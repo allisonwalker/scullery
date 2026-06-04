@@ -108,5 +108,5 @@ export interface AiRecipeSuggestion {
 // Slot in "preview" state during regeneration
 export interface PreviewSlot extends PlanSlot {
   suggested_recipe?: AiRecipeSuggestion
-  preview_status: 'accepted' | 'rejected' | 'pending'
+  preview_status: 'accepted' | 'rejected' | 'pending' | 'kept'
 }

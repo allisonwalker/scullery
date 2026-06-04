@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { WeeklyPlan, PlanSlot, Recipe, MealType, AiRecipeSuggestion } from '@/types'
+import type { WeeklyPlan, PlanSlot, Recipe, MealType, AiRecipeSuggestion, PreviewSlot, PlanConfig } from '@/types'
 import { usePlannerStore } from '@/store/plannerStore'
 import { createClient } from '@/lib/supabase/client'
 import { DAYS, MEAL_TYPE_LABELS, dayDate, isTodayColumn, cn, currentSeason } from '@/lib/utils'
-import { Lock, ShoppingCart, Sparkles, Sunrise, Sun, Moon, Leaf, ChevronDown, AlertCircle } from 'lucide-react'
+import {
+  Lock, ShoppingCart, Sparkles, Sunrise, Sun, Moon, Leaf,
+  ChevronDown, ChevronLeft, ChevronRight, AlertCircle,
+} from 'lucide-react'
 import { useToast } from '@/store/toastStore'
 import MealCard from './MealCard'
 import SwapSheet from './SwapSheet'
@@ -32,6 +35,9 @@ const MEAL_HEADER_ICONS: Record<MealType, React.ReactNode> = {
   dinner:    <Moon size={12} />,
   snack:     <Leaf size={12} />,
 }
+
+// Narrow width for collapsed columns (px)
+const COLLAPSED_PX = 36
 
 export default function PlannerGrid({
   plan,
@@ -73,7 +79,33 @@ export default function PlannerGrid({
     setConfig(plan.config)
   }, [plan.id])
 
-  // Group slots by day × meal type
+  // ── Config helpers ──────────────────────────────────────────────────────────
+  async function saveConfig(next: PlanConfig) {
+    setConfig(next)
+    const supabase = createClient()
+    await supabase.from('weekly_plans').update({ config: next }).eq('id', plan.id)
+  }
+
+  function toggleColumnVisibility(type: MealType) {
+    const hidden = config.hidden_meal_types ?? []
+    const isHidden = hidden.includes(type)
+    const next = isHidden
+      ? hidden.filter((t) => t !== type)
+      : [...hidden, type]
+    saveConfig({ ...config, hidden_meal_types: next })
+  }
+
+  // ── Derived layout values ───────────────────────────────────────────────────
+  const hiddenTypes = config.hidden_meal_types ?? []
+  // Mobile: only visible types in the accordion
+  const visibleMealOrder = MEAL_ORDER.filter((t) => !hiddenTypes.includes(t))
+
+  // Desktop: all types always in grid; hidden = narrow strip
+  const gridCols = `88px ${MEAL_ORDER.map((t) => hiddenTypes.includes(t) ? `${COLLAPSED_PX}px` : '1fr').join(' ')}`
+  const gridMaxWidth = `${88 + MEAL_ORDER.reduce((n, t) => n + (hiddenTypes.includes(t) ? COLLAPSED_PX + 12 : 412), 0)}px`
+  const gridMinWidth = `${88 + MEAL_ORDER.reduce((n, t) => n + (hiddenTypes.includes(t) ? COLLAPSED_PX + 12 : 180), 0)}px`
+
+  // ── Group slots by day × meal type ─────────────────────────────────────────
   const byDayType: Record<number, Record<MealType, PlanSlot[]>> = {}
   for (let d = 0; d < 7; d++) {
     byDayType[d] = { breakfast: [], lunch: [], dinner: [], snack: [] }
@@ -82,16 +114,7 @@ export default function PlannerGrid({
     byDayType[slot.day_of_week][slot.meal_type as MealType].push(slot)
   }
 
-  // Visible columns (respect hidden_meal_types from config)
-  const hiddenTypes = config.hidden_meal_types ?? []
-  const visibleMealOrder = MEAL_ORDER.filter((t) => !hiddenTypes.includes(t))
-  const gridCols = `88px repeat(${visibleMealOrder.length}, 1fr)`
-  // Cap each meal column at ~400 px so single-column views don't stretch absurdly wide.
-  // maxWidth = day-label(88) + gap-per-col(12) + col-cap(400) per visible column.
-  const gridMaxWidth = `${88 + visibleMealOrder.length * 412}px`
-  // Minimum width keeps columns readable on mobile; triggers horizontal scroll instead of squishing.
-  const gridMinWidth = `${88 + visibleMealOrder.length * 180}px`
-
+  // ── Stats ───────────────────────────────────────────────────────────────────
   const totalMeals = slots.filter((s) => s.recipe_id).length
   const lockedCount = slots.filter((s) => s.is_locked).length
   const newCount = slots.filter((s) => (s.recipe as Recipe | null)?.is_from_library === false).length
@@ -109,23 +132,33 @@ export default function PlannerGrid({
     }, 'library')
   }
 
+  // ── Regenerate: fill only empty slots ──────────────────────────────────────
   async function regenerate() {
     if (isRegenerating) return
     setRegenerating(true)
     const supabase = createClient()
 
     const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
-    const lockedSlots = slots.filter((s) => s.is_locked)
 
-    const lockedPerType: Record<MealType, number> = { breakfast: 0, lunch: 0, dinner: 0, snack: 0 }
-    for (const s of lockedSlots) lockedPerType[s.meal_type]++
+    // All slots that already have a recipe — these are kept as-is
+    const existingFilled = slots.filter((s) => s.recipe_id !== null)
 
+    // Count fills and occupied days per meal type
+    const filledPerType: Record<MealType, number> = { breakfast: 0, lunch: 0, dinner: 0, snack: 0 }
+    const occupiedDaysByType: Record<MealType, Set<number>> = {
+      breakfast: new Set(), lunch: new Set(), dinner: new Set(), snack: new Set(),
+    }
+    for (const s of existingFilled) {
+      filledPerType[s.meal_type as MealType]++
+      occupiedDaysByType[s.meal_type as MealType].add(s.day_of_week)
+    }
+
+    // Find gaps
     const newSlots: Omit<PlanSlot, 'id' | 'recipe'>[] = []
     for (const type of MEAL_TYPES) {
       const total = config[type]
-      const needed = Math.max(0, total - lockedPerType[type])
-      const lockedDays = new Set(lockedSlots.filter((s) => s.meal_type === type).map((s) => s.day_of_week))
-      const freeDays = [0,1,2,3,4,5,6].filter((d) => !lockedDays.has(d))
+      const needed = Math.max(0, total - filledPerType[type])
+      const freeDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => !occupiedDaysByType[type].has(d))
       for (let i = 0; i < Math.min(needed, freeDays.length); i++) {
         newSlots.push({
           plan_id: plan.id,
@@ -138,12 +171,26 @@ export default function PlannerGrid({
       }
     }
 
+    if (newSlots.length === 0) {
+      toast.info('Your plan is already full. Remove meals to make room for new suggestions.')
+      setRegenerating(false)
+      return
+    }
+
+    // Existing filled slots go into preview as 'kept' (untouched)
+    const keptPreview: PreviewSlot[] = existingFilled.map((s) => ({
+      ...s,
+      preview_status: 'kept' as const,
+    }))
+
+    // Fill the gaps with library or AI
     const libraryCount = Math.round(newSlots.length * config.library_ratio)
     const librarySlots = newSlots.slice(0, libraryCount)
     const aiSlots = newSlots.slice(libraryCount)
 
-    const filledSlots: PlanSlot[] = [...lockedSlots]
+    const newPreview: PreviewSlot[] = []
 
+    // Library slots
     for (const slot of librarySlots) {
       const { data: candidates } = await supabase
         .from('recipes')
@@ -156,10 +203,17 @@ export default function PlannerGrid({
 
       if (candidates && candidates.length > 0) {
         const recipe = candidates[Math.floor(Math.random() * candidates.length)] as Recipe
-        filledSlots.push({ ...slot, id: `tmp-${Math.random()}`, recipe_id: recipe.id, recipe } as PlanSlot)
+        newPreview.push({
+          ...slot,
+          id: `tmp-${Math.random()}`,
+          recipe_id: recipe.id,
+          recipe,
+          preview_status: 'pending',
+        } as PreviewSlot)
       }
     }
 
+    // AI slots
     if (aiSlots.length > 0) {
       const grouped: Partial<Record<MealType, number>> = {}
       for (const s of aiSlots) grouped[s.meal_type] = (grouped[s.meal_type] ?? 0) + 1
@@ -170,8 +224,7 @@ export default function PlannerGrid({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            meal_type: type,
-            count,
+            meal_type: type, count,
             recent_recipe_titles: recentTitles,
             household_preferences: preferences,
             season: currentSeason(),
@@ -187,62 +240,56 @@ export default function PlannerGrid({
         }
       }
 
-      let suggestionIdx = 0
+      let idx = 0
       for (const slot of aiSlots) {
-        const suggestion = suggestions[suggestionIdx++]
+        const suggestion = suggestions[idx++]
         if (suggestion) {
-          filledSlots.push({
+          newPreview.push({
             ...slot,
             id: `tmp-ai-${Math.random()}`,
             suggested_recipe: suggestion,
             preview_status: 'pending',
-          } as unknown as PlanSlot)
+          } as unknown as PreviewSlot)
         } else {
+          // Fallback to library
           const { data: candidates } = await supabase
-            .from('recipes')
-            .select('*')
-            .eq('household_id', householdId)
-            .eq('meal_type', slot.meal_type)
-            .order('rating', { ascending: false })
-            .limit(10)
+            .from('recipes').select('*')
+            .eq('household_id', householdId).eq('meal_type', slot.meal_type)
+            .order('rating', { ascending: false }).limit(10)
           if (candidates && candidates.length > 0) {
             const recipe = candidates[Math.floor(Math.random() * candidates.length)] as Recipe
-            filledSlots.push({ ...slot, id: `tmp-${Math.random()}`, recipe_id: recipe.id, recipe } as PlanSlot)
+            newPreview.push({
+              ...slot, id: `tmp-${Math.random()}`,
+              recipe_id: recipe.id, recipe, preview_status: 'pending',
+            } as PreviewSlot)
           }
         }
       }
     }
 
-    startPreview(filledSlots as never)
+    startPreview([...keptPreview, ...newPreview] as never)
     setRegenerating(false)
   }
 
+  // ── Commit preview: only insert new slots (kept slots are already in DB) ───
   async function commitPreview() {
     if (!previewSlots) return
     setCommitError(null)
     const supabase = createClient()
 
-    const unlocked = slots.filter((s) => !s.is_locked)
-    if (unlocked.length > 0) {
-      const { error } = await supabase
-        .from('plan_slots')
-        .delete()
-        .in('id', unlocked.map((s) => s.id))
-      if (error) {
-        setCommitError('Could not clear previous slots. Please refresh and try again.')
-        toast.error('Plan commit failed — please refresh.')
-        return
-      }
-    }
+    const keptSlots = previewSlots
+      .filter((s) => (s as never as { preview_status: string }).preview_status === 'kept')
+      .map((s) => s as PlanSlot)
 
-    const accepted = previewSlots.filter(
-      (s) => (s as never as { preview_status: string }).preview_status !== 'rejected'
-    )
+    const toInsert = previewSlots.filter((s) => {
+      const status = (s as never as { preview_status: string }).preview_status
+      return status !== 'rejected' && status !== 'kept'
+    })
 
-    const finalSlots: PlanSlot[] = []
+    const finalSlots: PlanSlot[] = [...keptSlots]
     let hasError = false
 
-    for (const preview of accepted) {
+    for (const preview of toInsert) {
       const p = preview as never as { preview_status: string; suggested_recipe?: AiRecipeSuggestion }
 
       if (preview.recipe_id) {
@@ -268,7 +315,6 @@ export default function PlannerGrid({
           source_url: p.suggested_recipe.source_url ?? null,
           is_from_library: false,
         }).select().single()
-
         if (recipeErr || !recipeData) { hasError = true; continue }
 
         const { data: slotData, error: slotErr } = await supabase.from('plan_slots').insert({
@@ -278,33 +324,31 @@ export default function PlannerGrid({
           recipe_id: recipeData.id,
           sort_order: preview.sort_order,
         }).select().single()
-
         if (slotErr) { hasError = true; continue }
         if (slotData) finalSlots.push({ ...slotData, recipe: recipeData })
-
-      } else if (preview.is_locked) {
-        finalSlots.push(preview)
       }
     }
 
     if (hasError) {
       toast.error('Some meals could not be saved — the plan may be incomplete.')
     } else {
-      toast.success('Plan saved.')
+      const addedCount = finalSlots.length - keptSlots.length
+      if (addedCount > 0) {
+        toast.success(`${addedCount} meal${addedCount !== 1 ? 's' : ''} added to plan.`)
+      }
     }
 
-    setSlots([...slots.filter((s) => s.is_locked), ...finalSlots])
+    setSlots(finalSlots)
     clearPreview()
     router.refresh()
   }
 
   // ── Preview mode ────────────────────────────────────────────────────────────
   if (previewSlots) {
-    const hiddenTypes = config.hidden_meal_types ?? []
-    const visibleMealOrder = MEAL_ORDER.filter((t) => !hiddenTypes.includes(t))
-    const gridCols = `88px repeat(${visibleMealOrder.length}, 1fr)`
-    const gridMaxWidth = `${88 + visibleMealOrder.length * 412}px`
-    const gridMinWidth = `${88 + visibleMealOrder.length * 180}px`
+    const pendingSlots = previewSlots.filter(
+      (s) => (s as never as { preview_status: string }).preview_status === 'pending'
+    )
+    const pendingCount = pendingSlots.length
 
     const previewByDayType: Record<number, Record<MealType, typeof previewSlots>> = {}
     for (let d = 0; d < 7; d++) {
@@ -319,8 +363,12 @@ export default function PlannerGrid({
         {/* Preview banner */}
         <div className="bg-purple-50 border-b border-purple-200 px-5 py-3 flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-purple-900">Review new plan suggestions</p>
-            <p className="text-xs text-purple-600 mt-0.5">Accept or reject each suggestion, then commit.</p>
+            <p className="text-sm font-medium text-purple-900">
+              {pendingCount} new suggestion{pendingCount !== 1 ? 's' : ''} for your plan
+            </p>
+            <p className="text-xs text-purple-600 mt-0.5">
+              Skip any you don't want, then add the rest.
+            </p>
             {commitError && (
               <p className="flex items-center gap-1.5 text-xs text-red-600 mt-1.5">
                 <AlertCircle size={12} /> {commitError}
@@ -328,77 +376,106 @@ export default function PlannerGrid({
             )}
           </div>
           <div className="flex gap-2 shrink-0">
-            <button onClick={commitPreview} className="btn-primary text-sm">Commit plan</button>
-            <button onClick={clearPreview} className="btn-secondary text-sm">Discard</button>
+            <button onClick={commitPreview} className="btn-primary text-sm">Add to plan</button>
+            <button onClick={clearPreview} className="btn-secondary text-sm">Cancel</button>
           </div>
         </div>
 
         <div className="p-5">
           <div style={{ minWidth: gridMinWidth }}>
-          {/* Column headers */}
-          <div className="grid gap-3 mb-2 px-2" style={{ gridTemplateColumns: gridCols }}>
-            <div />
-            {visibleMealOrder.map((type) => (
-              <div key={type} className="flex items-center justify-center gap-1.5 py-1">
-                <span className="text-brand-400/70">{MEAL_HEADER_ICONS[type]}</span>
-                <span className="text-xs font-semibold text-brand-600/70">
-                  {MEAL_TYPE_LABELS[type]}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Day rows */}
-          <div className="space-y-2">
-            {DAYS.map((day, dayIdx) => {
-              const isToday = isTodayColumn(weekStart, dayIdx)
-              const date = dayDate(weekStart, dayIdx)
-              return (
-                <div
-                  key={dayIdx}
-                  className={cn(
-                    'grid gap-3 p-2 rounded-xl',
-                    isToday ? 'bg-brand-50/80 ring-1 ring-brand-200/50' : 'hover:bg-black/[0.02]',
-                  )}
-                  style={{ gridTemplateColumns: gridCols }}
-                >
-                  <div className="flex flex-col justify-center py-1">
-                    <p className={cn('text-sm font-semibold', isToday ? 'text-brand-600' : 'text-gray-700')}>{day}</p>
-                    <p className="text-xs text-gray-400">{date.getDate()}</p>
+            {/* Column headers */}
+            <div className="grid gap-3 mb-2 px-2" style={{ gridTemplateColumns: gridCols }}>
+              <div />
+              {MEAL_ORDER.map((type) => {
+                const isHidden = hiddenTypes.includes(type)
+                return isHidden ? (
+                  <div key={type} className="flex items-center justify-center">
+                    <span className="text-gray-300">{MEAL_HEADER_ICONS[type]}</span>
                   </div>
+                ) : (
+                  <div key={type} className="flex items-center justify-center gap-1.5 py-1">
+                    <span className="text-brand-400/70">{MEAL_HEADER_ICONS[type]}</span>
+                    <span className="text-xs font-semibold text-brand-600/70">
+                      {MEAL_TYPE_LABELS[type]}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
 
-                  {visibleMealOrder.map((mealType) => {
-                    const cellSlots = previewByDayType[dayIdx][mealType]
-                    if (cellSlots.length === 0) return <div key={mealType} />
+            {/* Day rows */}
+            <div className="space-y-2">
+              {DAYS.map((day, dayIdx) => {
+                const isToday = isTodayColumn(weekStart, dayIdx)
+                const date = dayDate(weekStart, dayIdx)
+                return (
+                  <div
+                    key={dayIdx}
+                    className={cn(
+                      'grid gap-3 p-2 rounded-xl',
+                      isToday ? 'bg-brand-50/80 ring-1 ring-brand-200/50' : 'hover:bg-black/[0.02]',
+                    )}
+                    style={{ gridTemplateColumns: gridCols }}
+                  >
+                    <div className="flex flex-col justify-center py-1">
+                      <p className={cn('text-sm font-semibold', isToday ? 'text-brand-600' : 'text-gray-700')}>{day}</p>
+                      <p className="text-xs text-gray-400">{date.getDate()}</p>
+                    </div>
 
-                    return (
-                      <div key={mealType} className="space-y-1.5">
-                        {cellSlots.map((slot) => {
-                          const p = slot as never as { preview_status: string; suggested_recipe?: AiRecipeSuggestion }
-                          const recipe = slot.recipe as Recipe | null
-                          const name = recipe?.title ?? p.suggested_recipe?.title ?? '—'
-                          const isRejected = p.preview_status === 'rejected'
-                          const isLocked = slot.is_locked
+                    {MEAL_ORDER.map((mealType) => {
+                      const isHidden = hiddenTypes.includes(mealType)
+                      if (isHidden) return <div key={mealType} />
 
-                          return (
-                            <div key={slot.id} className={cn('card px-3 py-2.5', isRejected && 'opacity-40')}>
-                              <p className="text-xs font-medium text-gray-900 line-clamp-2 leading-snug">{name}</p>
-                              {!isLocked && (
+                      const cellSlots = previewByDayType[dayIdx][mealType]
+                      if (cellSlots.length === 0) return <div key={mealType} />
+
+                      return (
+                        <div key={mealType} className="space-y-1.5">
+                          {cellSlots.map((slot) => {
+                            const p = slot as never as { preview_status: string; suggested_recipe?: AiRecipeSuggestion }
+                            const recipe = slot.recipe as Recipe | null
+                            const name = recipe?.title ?? p.suggested_recipe?.title ?? '—'
+                            const isRejected = p.preview_status === 'rejected'
+                            const isKept = p.preview_status === 'kept'
+
+                            if (isKept) {
+                              // Already in plan — just show it, no actions
+                              return (
+                                <div key={slot.id} className="card px-3 py-2.5 opacity-60">
+                                  <p className="text-xs font-medium text-gray-700 line-clamp-2 leading-snug">{name}</p>
+                                  {slot.is_locked && (
+                                    <p className="text-[10px] text-amber-500 mt-1 flex items-center gap-1">
+                                      <Lock size={9} /> locked
+                                    </p>
+                                  )}
+                                </div>
+                              )
+                            }
+
+                            return (
+                              <div
+                                key={slot.id}
+                                className={cn(
+                                  'card px-3 py-2.5 border-purple-200 bg-purple-50/60',
+                                  isRejected && 'opacity-30 border-gray-200 bg-white',
+                                )}
+                              >
+                                <p className="text-xs font-medium text-gray-900 line-clamp-2 leading-snug">{name}</p>
                                 <div className="flex gap-2 mt-1.5">
                                   {p.suggested_recipe && (
                                     <button
                                       onClick={() => setPreviewSuggestion(p.suggested_recipe!)}
                                       className="text-xs text-gray-400 hover:text-gray-700 underline"
                                     >
-                                      View
+                                      Details
                                     </button>
                                   )}
                                   {!isRejected ? (
                                     <button
                                       onClick={() => rejectPreviewSlot(slot.id)}
-                                      className="text-xs text-red-500 hover:text-red-700"
+                                      className="text-xs text-gray-400 hover:text-red-500 transition-colors"
                                     >
-                                      Reject
+                                      Skip
                                     </button>
                                   ) : (
                                     <button
@@ -409,23 +486,17 @@ export default function PlannerGrid({
                                     </button>
                                   )}
                                 </div>
-                              )}
-                              {isLocked && (
-                                <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
-                                  <Lock size={9} /> locked
-                                </p>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
           </div>
-          </div>{/* end minWidth wrapper */}
         </div>
 
         {/* AI suggestion detail slide-over */}
@@ -496,12 +567,7 @@ export default function PlannerGrid({
       {/* Grid */}
       <div className="flex-1 overflow-auto p-5">
 
-        {visibleMealOrder.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-sm font-medium text-gray-400">All columns hidden</p>
-            <p className="text-xs text-gray-400 mt-1">Use the controls above to show meal type columns.</p>
-          </div>
-        ) : (
+        {(true) && (
           <>
             {/* ── Mobile accordion (hidden on sm+) ─────────────────────────── */}
             <div className="sm:hidden space-y-2">
@@ -550,7 +616,7 @@ export default function PlannerGrid({
                       />
                     </button>
 
-                    {/* Expanded: meal type sections */}
+                    {/* Expanded: meal type sections (visible types only) */}
                     {isExpanded && (
                       <div className="bg-white divide-y divide-gray-50 border-t border-gray-100">
                         {visibleMealOrder.map((mealType) => {
@@ -590,14 +656,41 @@ export default function PlannerGrid({
               {/* Column headers */}
               <div className="grid gap-3 mb-1 px-2" style={{ gridTemplateColumns: gridCols }}>
                 <div /> {/* corner */}
-                {visibleMealOrder.map((type) => (
-                  <div key={type} className="flex items-center justify-center gap-1.5 py-1.5">
-                    <span className="text-brand-400/80">{MEAL_HEADER_ICONS[type]}</span>
-                    <span className="text-xs font-semibold text-brand-600/80">
-                      {MEAL_TYPE_LABELS[type]}
-                    </span>
-                  </div>
-                ))}
+                {MEAL_ORDER.map((type) => {
+                  const isHidden = hiddenTypes.includes(type)
+
+                  if (isHidden) {
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => toggleColumnVisibility(type)}
+                        title={`Show ${MEAL_TYPE_LABELS[type]}`}
+                        className="flex flex-col items-center justify-center gap-1 py-2 rounded-lg
+                                   text-gray-300 hover:text-brand-500 hover:bg-brand-50 transition-colors group"
+                      >
+                        <span className="group-hover:text-brand-400">{MEAL_HEADER_ICONS[type]}</span>
+                        <ChevronRight size={10} className="group-hover:text-brand-500" />
+                      </button>
+                    )
+                  }
+
+                  return (
+                    <div key={type} className="flex items-center justify-center gap-1.5 py-1.5 group relative">
+                      <span className="text-brand-400/80">{MEAL_HEADER_ICONS[type]}</span>
+                      <span className="text-xs font-semibold text-brand-600/80">
+                        {MEAL_TYPE_LABELS[type]}
+                      </span>
+                      <button
+                        onClick={() => toggleColumnVisibility(type)}
+                        title={`Collapse ${MEAL_TYPE_LABELS[type]}`}
+                        className="absolute -right-0.5 opacity-0 group-hover:opacity-100 text-gray-300
+                                   hover:text-gray-500 transition-all"
+                      >
+                        <ChevronLeft size={12} />
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
 
               {/* Day rows */}
@@ -626,7 +719,18 @@ export default function PlannerGrid({
                       </div>
 
                       {/* Meal type cells */}
-                      {visibleMealOrder.map((mealType) => {
+                      {MEAL_ORDER.map((mealType) => {
+                        const isHidden = hiddenTypes.includes(mealType)
+
+                        if (isHidden) {
+                          // Narrow divider for collapsed column
+                          return (
+                            <div key={mealType} className="flex justify-center pt-1">
+                              <div className="w-px bg-gray-100 rounded-full self-stretch" />
+                            </div>
+                          )
+                        }
+
                         const cellSlots = byDayType[dayIdx][mealType]
                         return (
                           <div key={mealType} className="group space-y-1.5">
@@ -674,6 +778,11 @@ export default function PlannerGrid({
           {newCount > 0 && (
             <span className="flex items-center gap-1 text-xs text-purple-300">
               <Sparkles size={10} /> {newCount} new
+            </span>
+          )}
+          {hiddenTypes.length > 0 && (
+            <span className="text-xs text-brand-500">
+              {hiddenTypes.length} column{hiddenTypes.length !== 1 ? 's' : ''} collapsed
             </span>
           )}
         </div>
