@@ -6,7 +6,8 @@ import type { WeeklyPlan, PlanSlot, Recipe, MealType, AiRecipeSuggestion } from 
 import { usePlannerStore } from '@/store/plannerStore'
 import { createClient } from '@/lib/supabase/client'
 import { DAYS, MEAL_TYPE_LABELS, dayDate, isTodayColumn, cn, currentSeason } from '@/lib/utils'
-import { Lock, ShoppingCart, Sparkles, Sunrise, Sun, Moon, Leaf, ChevronDown } from 'lucide-react'
+import { Lock, ShoppingCart, Sparkles, Sunrise, Sun, Moon, Leaf, ChevronDown, AlertCircle } from 'lucide-react'
+import { useToast } from '@/store/toastStore'
 import MealCard from './MealCard'
 import SwapSheet from './SwapSheet'
 import RecipeSlideOver from './RecipeSlideOver'
@@ -46,8 +47,10 @@ export default function PlannerGrid({
     previewSlots, startPreview, acceptPreviewSlot, rejectPreviewSlot, clearPreview,
   } = usePlannerStore()
   const router = useRouter()
+  const toast = useToast()
   const [promptText, setPromptText] = useState('')
   const [previewSuggestion, setPreviewSuggestion] = useState<AiRecipeSuggestion | null>(null)
+  const [commitError, setCommitError] = useState<string | null>(null)
 
   // Mobile accordion: which days are expanded (default: today)
   const [expandedDays, setExpandedDays] = useState<Set<number>>(() => {
@@ -216,20 +219,34 @@ export default function PlannerGrid({
 
   async function commitPreview() {
     if (!previewSlots) return
+    setCommitError(null)
     const supabase = createClient()
 
     const unlocked = slots.filter((s) => !s.is_locked)
     if (unlocked.length > 0) {
-      await supabase.from('plan_slots').delete().in('id', unlocked.map((s) => s.id))
+      const { error } = await supabase
+        .from('plan_slots')
+        .delete()
+        .in('id', unlocked.map((s) => s.id))
+      if (error) {
+        setCommitError('Could not clear previous slots. Please refresh and try again.')
+        toast.error('Plan commit failed — please refresh.')
+        return
+      }
     }
 
-    const accepted = previewSlots.filter((s) => (s as never as { preview_status: string }).preview_status !== 'rejected')
+    const accepted = previewSlots.filter(
+      (s) => (s as never as { preview_status: string }).preview_status !== 'rejected'
+    )
 
     const finalSlots: PlanSlot[] = []
+    let hasError = false
+
     for (const preview of accepted) {
       const p = preview as never as { preview_status: string; suggested_recipe?: AiRecipeSuggestion }
+
       if (preview.recipe_id) {
-        const { data } = await supabase.from('plan_slots').insert({
+        const { data, error } = await supabase.from('plan_slots').insert({
           plan_id: plan.id,
           day_of_week: preview.day_of_week,
           meal_type: preview.meal_type,
@@ -237,9 +254,11 @@ export default function PlannerGrid({
           is_locked: preview.is_locked,
           sort_order: preview.sort_order,
         }).select().single()
+        if (error) { hasError = true; continue }
         if (data) finalSlots.push({ ...data, recipe: preview.recipe })
+
       } else if (p.suggested_recipe) {
-        const { data: recipeData } = await supabase.from('recipes').insert({
+        const { data: recipeData, error: recipeErr } = await supabase.from('recipes').insert({
           household_id: householdId,
           title: p.suggested_recipe.title,
           description: p.suggested_recipe.description,
@@ -250,19 +269,28 @@ export default function PlannerGrid({
           is_from_library: false,
         }).select().single()
 
-        if (recipeData) {
-          const { data: slotData } = await supabase.from('plan_slots').insert({
-            plan_id: plan.id,
-            day_of_week: preview.day_of_week,
-            meal_type: preview.meal_type,
-            recipe_id: recipeData.id,
-            sort_order: preview.sort_order,
-          }).select().single()
-          if (slotData) finalSlots.push({ ...slotData, recipe: recipeData })
-        }
+        if (recipeErr || !recipeData) { hasError = true; continue }
+
+        const { data: slotData, error: slotErr } = await supabase.from('plan_slots').insert({
+          plan_id: plan.id,
+          day_of_week: preview.day_of_week,
+          meal_type: preview.meal_type,
+          recipe_id: recipeData.id,
+          sort_order: preview.sort_order,
+        }).select().single()
+
+        if (slotErr) { hasError = true; continue }
+        if (slotData) finalSlots.push({ ...slotData, recipe: recipeData })
+
       } else if (preview.is_locked) {
         finalSlots.push(preview)
       }
+    }
+
+    if (hasError) {
+      toast.error('Some meals could not be saved — the plan may be incomplete.')
+    } else {
+      toast.success('Plan saved.')
     }
 
     setSlots([...slots.filter((s) => s.is_locked), ...finalSlots])
@@ -289,14 +317,19 @@ export default function PlannerGrid({
     return (
       <div className="flex-1 overflow-auto">
         {/* Preview banner */}
-        <div className="bg-purple-50 border-b border-purple-200 px-5 py-3 flex items-center justify-between">
-          <div>
+        <div className="bg-purple-50 border-b border-purple-200 px-5 py-3 flex items-center justify-between gap-4">
+          <div className="min-w-0">
             <p className="text-sm font-medium text-purple-900">Review new plan suggestions</p>
             <p className="text-xs text-purple-600 mt-0.5">Accept or reject each suggestion, then commit.</p>
+            {commitError && (
+              <p className="flex items-center gap-1.5 text-xs text-red-600 mt-1.5">
+                <AlertCircle size={12} /> {commitError}
+              </p>
+            )}
           </div>
-          <div className="flex gap-2">
-            <button onClick={clearPreview} className="btn-secondary text-sm">Discard</button>
+          <div className="flex gap-2 shrink-0">
             <button onClick={commitPreview} className="btn-primary text-sm">Commit plan</button>
+            <button onClick={clearPreview} className="btn-secondary text-sm">Discard</button>
           </div>
         </div>
 
@@ -308,7 +341,7 @@ export default function PlannerGrid({
             {visibleMealOrder.map((type) => (
               <div key={type} className="flex items-center justify-center gap-1.5 py-1">
                 <span className="text-brand-400/70">{MEAL_HEADER_ICONS[type]}</span>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-600/70">
+                <span className="text-xs font-semibold text-brand-600/70">
                   {MEAL_TYPE_LABELS[type]}
                 </span>
               </div>
@@ -526,7 +559,7 @@ export default function PlannerGrid({
                             <div key={mealType} className="px-4 py-3">
                               <div className="flex items-center gap-1.5 mb-2">
                                 <span className="text-brand-400/70">{MEAL_HEADER_ICONS[mealType]}</span>
-                                <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-600/70">
+                                <span className="text-xs font-semibold text-brand-600/70">
                                   {MEAL_TYPE_LABELS[mealType]}
                                 </span>
                               </div>
@@ -560,7 +593,7 @@ export default function PlannerGrid({
                 {visibleMealOrder.map((type) => (
                   <div key={type} className="flex items-center justify-center gap-1.5 py-1.5">
                     <span className="text-brand-400/80">{MEAL_HEADER_ICONS[type]}</span>
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-600/80">
+                    <span className="text-xs font-semibold text-brand-600/80">
                       {MEAL_TYPE_LABELS[type]}
                     </span>
                   </div>

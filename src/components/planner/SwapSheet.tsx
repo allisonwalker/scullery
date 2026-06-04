@@ -8,12 +8,14 @@ import { MEAL_TYPE_LABELS, currentSeason, cn } from '@/lib/utils'
 import SlideOver from '@/components/ui/SlideOver'
 import { MealTypeBadge } from '@/components/ui/Badge'
 import StarRating from '@/components/ui/StarRating'
+import { useToast } from '@/store/toastStore'
 
 export default function SwapSheet({ householdId }: { householdId: string }) {
   const {
     swapTargetSlot, swapSheetTab,
     closeSwapSheet, updateSlot, addSlot, slots,
   } = usePlannerStore()
+  const toast = useToast()
 
   // ── Library tab state ──────────────────────────────────────────────────────
   const [recipes, setRecipes] = useState<Recipe[]>([])
@@ -66,7 +68,7 @@ export default function SwapSheet({ householdId }: { householdId: string }) {
     const supabase = createClient()
 
     if (swapTargetSlot.recipe_id === null && swapTargetSlot.id.startsWith('new-')) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('plan_slots')
         .insert({
           plan_id: swapTargetSlot.plan_id,
@@ -77,9 +79,14 @@ export default function SwapSheet({ householdId }: { householdId: string }) {
         })
         .select()
         .single()
+      if (error) { toast.error('Could not add meal — please try again.'); return }
       if (data) addSlot({ ...data, recipe })
     } else {
-      await supabase.from('plan_slots').update({ recipe_id: recipe.id }).eq('id', swapTargetSlot.id)
+      const { error } = await supabase
+        .from('plan_slots')
+        .update({ recipe_id: recipe.id })
+        .eq('id', swapTargetSlot.id)
+      if (error) { toast.error('Could not swap recipe — please try again.'); return }
       updateSlot(swapTargetSlot.id, { recipe_id: recipe.id, recipe })
     }
     closeSwapSheet()
@@ -121,7 +128,7 @@ export default function SwapSheet({ householdId }: { householdId: string }) {
     setAccepting(true)
     const supabase = createClient()
 
-    const { data: recipeData } = await supabase
+    const { data: recipeData, error: recipeError } = await supabase
       .from('recipes')
       .insert({
         household_id: householdId,
@@ -136,10 +143,14 @@ export default function SwapSheet({ householdId }: { householdId: string }) {
       .select()
       .single()
 
-    if (!recipeData) { setAccepting(false); return }
+    if (recipeError || !recipeData) {
+      toast.error('Could not save recipe — please try again.')
+      setAccepting(false)
+      return
+    }
 
     if (swapTargetSlot.id.startsWith('new-')) {
-      const { data: slotData } = await supabase
+      const { data: slotData, error: slotError } = await supabase
         .from('plan_slots')
         .insert({
           plan_id: swapTargetSlot.plan_id,
@@ -150,10 +161,21 @@ export default function SwapSheet({ householdId }: { householdId: string }) {
         })
         .select()
         .single()
-      if (slotData) addSlot({ ...slotData, recipe: recipeData })
+      if (slotError) {
+        toast.error('Recipe saved but could not add to plan — please refresh.')
+      } else if (slotData) {
+        addSlot({ ...slotData, recipe: recipeData })
+      }
     } else {
-      await supabase.from('plan_slots').update({ recipe_id: recipeData.id }).eq('id', swapTargetSlot.id)
-      updateSlot(swapTargetSlot.id, { recipe_id: recipeData.id, recipe: recipeData })
+      const { error: updateError } = await supabase
+        .from('plan_slots')
+        .update({ recipe_id: recipeData.id })
+        .eq('id', swapTargetSlot.id)
+      if (updateError) {
+        toast.error('Recipe saved but could not update plan — please refresh.')
+      } else {
+        updateSlot(swapTargetSlot.id, { recipe_id: recipeData.id, recipe: recipeData })
+      }
     }
 
     setAccepting(false)
@@ -291,7 +313,7 @@ export default function SwapSheet({ householdId }: { householdId: string }) {
 
               {suggestion.ingredients.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                  <p className="text-xs font-semibold text-gray-600 mb-1.5">
                     Ingredients
                   </p>
                   <ul className="space-y-1">

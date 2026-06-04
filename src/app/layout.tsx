@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Lora } from 'next/font/google'
+import { ToastContainer } from '@/components/ui/Toast'
 import './globals.css'
 
 // Force dynamic rendering for all pages — this is a private auth-gated app
@@ -21,7 +22,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={lora.variable}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ToastContainer />
+      </body>
     </html>
   )
 }

@@ -30,17 +30,19 @@ export default async function PlannerWeekPage({ params }: Props) {
     .single()
 
   if (!profile?.household_id) {
-    // Profile missing — show a setup prompt instead of redirecting to /login
+    // Profile missing — show a friendly prompt instead of redirecting to /login
     // (redirecting there creates a loop because middleware bounces logged-in users back)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 text-center">
-        <div>
-          <p className="text-lg font-semibold text-gray-800 mb-2">Database setup required</p>
-          <p className="text-sm text-gray-500 max-w-sm">
-            Your account was created but the database migration hasn't run yet.
-            Go to your Supabase dashboard → SQL Editor, paste the migration file, and click Run.
-            Then sign out and sign back in.
+      <div className="min-h-screen flex items-center justify-center px-4 text-center" style={{ backgroundColor: 'oklch(0.98 0.003 145)' }}>
+        <div className="max-w-sm">
+          <p className="text-lg font-semibold text-gray-800 mb-2">Your account isn't set up yet</p>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            It looks like your household hasn't been created. Try signing out and back in, or
+            contact whoever invited you to make sure the invitation is still active.
           </p>
+          <a href="/login" className="mt-6 inline-block text-sm font-medium text-brand-600 hover:underline">
+            Back to sign in
+          </a>
         </div>
       </div>
     )

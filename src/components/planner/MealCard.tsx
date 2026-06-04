@@ -1,36 +1,84 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Lock, LockOpen, RefreshCw, X, Clock } from 'lucide-react'
 import type { PlanSlot, Recipe } from '@/types'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/Badge'
 import { RecipePlaceholder } from '@/components/ui/RecipePlaceholder'
+import { BottomSheet, BottomSheetItem } from '@/components/ui/BottomSheet'
 import { usePlannerStore } from '@/store/plannerStore'
+import { useToast } from '@/store/toastStore'
 import { createClient } from '@/lib/supabase/client'
 
 interface MealCardProps {
   slot: PlanSlot
 }
 
+const LONG_PRESS_MS = 500
 
 export default function MealCard({ slot }: MealCardProps) {
   const [hovered, setHovered] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const { updateSlot, openSlideOver, openSwapSheet } = usePlannerStore()
+  const toast = useToast()
+
+  // Long-press detection
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const didLongPress = useRef(false)
+
+  function startPress() {
+    didLongPress.current = false
+    pressTimer.current = setTimeout(() => {
+      didLongPress.current = true
+      // Haptic feedback where supported
+      if ('vibrate' in navigator) navigator.vibrate(50)
+      setMenuOpen(true)
+    }, LONG_PRESS_MS)
+  }
+
+  function cancelPress() {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current)
+      pressTimer.current = null
+    }
+  }
 
   const recipe = slot.recipe as Recipe | null | undefined
 
   async function toggleLock() {
     const supabase = createClient()
     const newLocked = !slot.is_locked
-    await supabase.from('plan_slots').update({ is_locked: newLocked }).eq('id', slot.id)
+    const { error } = await supabase
+      .from('plan_slots')
+      .update({ is_locked: newLocked })
+      .eq('id', slot.id)
+    if (error) {
+      toast.error('Could not update lock — please try again.')
+      return
+    }
     updateSlot(slot.id, { is_locked: newLocked })
   }
 
   async function removeSlot() {
     const supabase = createClient()
-    await supabase.from('plan_slots').delete().eq('id', slot.id)
+    const { error } = await supabase.from('plan_slots').delete().eq('id', slot.id)
+    if (error) {
+      toast.error('Could not remove meal — please try again.')
+      return
+    }
     usePlannerStore.getState().removeSlot(slot.id)
+    setMenuOpen(false)
+  }
+
+  function handleSwap() {
+    openSwapSheet(slot)
+    setMenuOpen(false)
+  }
+
+  async function handleToggleLockFromMenu() {
+    await toggleLock()
+    setMenuOpen(false)
   }
 
   if (!recipe) {
@@ -48,106 +96,150 @@ export default function MealCard({ slot }: MealCardProps) {
   const showActions = hovered || slot.is_locked
 
   return (
-    <div
-      className={cn(
-        'card overflow-hidden relative group cursor-pointer transition-all hover:shadow-sm',
-        slot.is_locked && 'ring-1 ring-amber-300 bg-amber-50/30',
-      )}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={() => openSlideOver(recipe)}
-    >
-      {/* Photo or placeholder */}
-      {recipe.photo_url ? (
-        <img
-          src={recipe.photo_url}
-          alt={recipe.title}
-          className="w-full h-16 object-cover"
-        />
-      ) : (
-        <RecipePlaceholder className="w-full h-16" />
-      )}
-
-      {/* Hover action buttons — float over the image/strip */}
+    <>
       <div
         className={cn(
-          'absolute top-1 right-1 flex items-center gap-0.5 transition-opacity',
-          showActions ? 'opacity-100' : 'opacity-0',
+          'card overflow-hidden relative group cursor-pointer transition-all hover:shadow-sm',
+          slot.is_locked && 'ring-1 ring-amber-300 bg-amber-50/30',
         )}
-        onClick={(e) => e.stopPropagation()}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onClick={(e) => {
+          // Don't open slide-over if the click ended a long-press
+          if (didLongPress.current) { didLongPress.current = false; return }
+          openSlideOver(recipe)
+        }}
+        // Long-press via pointer events (works on touch and mouse)
+        onPointerDown={startPress}
+        onPointerUp={cancelPress}
+        onPointerCancel={cancelPress}
+        onPointerLeave={cancelPress}
+        // Suppress browser context menu on mobile long-press
+        onContextMenu={(e) => {
+          if ('ontouchstart' in window) e.preventDefault()
+        }}
       >
-        <button
-          title={slot.is_locked ? 'Unlock' : 'Lock'}
-          onClick={toggleLock}
-          className={cn(
-            'w-5 h-5 rounded flex items-center justify-center transition-colors',
-            recipe.photo_url ? 'bg-black/30 text-white hover:bg-black/50' : '',
-            !recipe.photo_url && slot.is_locked  ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : '',
-            !recipe.photo_url && !slot.is_locked ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : '',
-          )}
-        >
-          {slot.is_locked
-            ? <Lock size={11} />
-            : <LockOpen size={11} />
-          }
-        </button>
-        {!slot.is_locked && (
-          <>
-            <button
-              title="Swap recipe"
-              onClick={() => openSwapSheet(slot)}
-              className={cn(
-                'w-5 h-5 rounded flex items-center justify-center transition-colors',
-                recipe.photo_url
-                  ? 'bg-black/30 text-white hover:bg-black/50'
-                  : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50',
-              )}
-            >
-              <RefreshCw size={11} />
-            </button>
-            <button
-              title="Remove"
-              onClick={removeSlot}
-              className={cn(
-                'w-5 h-5 rounded flex items-center justify-center transition-colors',
-                recipe.photo_url
-                  ? 'bg-black/30 text-white hover:bg-red-500/80'
-                  : 'text-gray-400 hover:text-red-500 hover:bg-red-50',
-              )}
-            >
-              <X size={11} />
-            </button>
-          </>
+        {/* Photo or placeholder */}
+        {recipe.photo_url ? (
+          <img
+            src={recipe.photo_url}
+            alt={recipe.title}
+            className="w-full h-16 object-cover"
+            draggable={false}
+          />
+        ) : (
+          <RecipePlaceholder className="w-full h-16" />
         )}
-      </div>
 
-      {/* Card content */}
-      <div className="px-2.5 py-2">
-        {/* Badges */}
-        <div className="flex items-center gap-1 mb-1">
-          {recipe.is_from_library ? (
-            <Badge variant="library" className="text-[9px] px-1.5 py-0">library</Badge>
-          ) : (
-            <Badge variant="new" className="text-[9px] px-1.5 py-0">new</Badge>
+        {/* Hover action buttons — desktop only (float over the image) */}
+        <div
+          className={cn(
+            'absolute top-1 right-1 sm:flex items-center gap-0.5 transition-opacity hidden',
+            showActions ? 'opacity-100' : 'opacity-0',
           )}
-          {slot.is_locked && (
-            <Lock size={9} className="text-amber-500" />
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <button
+            title={slot.is_locked ? 'Unlock' : 'Lock'}
+            onClick={toggleLock}
+            className={cn(
+              'w-5 h-5 rounded flex items-center justify-center transition-colors',
+              recipe.photo_url ? 'bg-black/30 text-white hover:bg-black/50' : '',
+              !recipe.photo_url && slot.is_locked  ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : '',
+              !recipe.photo_url && !slot.is_locked ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : '',
+            )}
+          >
+            {slot.is_locked ? <Lock size={11} /> : <LockOpen size={11} />}
+          </button>
+          {!slot.is_locked && (
+            <>
+              <button
+                title="Swap recipe"
+                onClick={() => openSwapSheet(slot)}
+                className={cn(
+                  'w-5 h-5 rounded flex items-center justify-center transition-colors',
+                  recipe.photo_url
+                    ? 'bg-black/30 text-white hover:bg-black/50'
+                    : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50',
+                )}
+              >
+                <RefreshCw size={11} />
+              </button>
+              <button
+                title="Remove"
+                onClick={removeSlot}
+                className={cn(
+                  'w-5 h-5 rounded flex items-center justify-center transition-colors',
+                  recipe.photo_url
+                    ? 'bg-black/30 text-white hover:bg-red-500/80'
+                    : 'text-gray-400 hover:text-red-500 hover:bg-red-50',
+                )}
+              >
+                <X size={11} />
+              </button>
+            </>
           )}
         </div>
 
-        {/* Title */}
-        <p className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2">
-          {recipe.title}
-        </p>
+        {/* Card content */}
+        <div className="px-2.5 py-2">
+          {/* Badges */}
+          <div className="flex items-center gap-1 mb-1">
+            {recipe.is_from_library ? (
+              <Badge variant="library" className="text-[9px] px-1.5 py-0">library</Badge>
+            ) : (
+              <Badge variant="new" className="text-[9px] px-1.5 py-0">new</Badge>
+            )}
+            {slot.is_locked && (
+              <Lock size={9} className="text-amber-500" />
+            )}
+          </div>
 
-        {/* Cook time */}
-        {recipe.cook_time_minutes && (
-          <p className="mt-1 text-[10px] text-gray-400 flex items-center gap-1">
-            <Clock size={9} />
-            {recipe.cook_time_minutes} min
+          {/* Title */}
+          <p className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2">
+            {recipe.title}
           </p>
-        )}
+
+          {/* Cook time */}
+          {recipe.cook_time_minutes && (
+            <p className="mt-1 text-[10px] text-gray-400 flex items-center gap-1">
+              <Clock size={9} />
+              {recipe.cook_time_minutes} min
+            </p>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Long-press context menu (mobile) */}
+      <BottomSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title={recipe.title}
+      >
+        <div className="space-y-0.5">
+          <BottomSheetItem
+            icon={slot.is_locked ? <LockOpen size={18} /> : <Lock size={18} />}
+            label={slot.is_locked ? 'Unlock this meal' : 'Lock — keep when regenerating'}
+            onClick={handleToggleLockFromMenu}
+          />
+          {!slot.is_locked && (
+            <BottomSheetItem
+              icon={<RefreshCw size={18} />}
+              label="Swap recipe"
+              onClick={handleSwap}
+            />
+          )}
+          {!slot.is_locked && (
+            <BottomSheetItem
+              icon={<X size={18} />}
+              label="Remove from plan"
+              onClick={removeSlot}
+              destructive
+            />
+          )}
+        </div>
+      </BottomSheet>
+    </>
   )
 }
