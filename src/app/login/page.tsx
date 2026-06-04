@@ -32,12 +32,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <span className="inline-flex items-center gap-2 text-2xl font-semibold text-gray-900">
-            <span className="w-3 h-3 rounded-full bg-brand-500 inline-block" />
-            Scullery
+          <span className="font-serif italic font-semibold text-3xl text-brand-800 tracking-tight">
+            scullery
           </span>
           <p className="mt-2 text-sm text-gray-500">Sign in to your household</p>
         </div>

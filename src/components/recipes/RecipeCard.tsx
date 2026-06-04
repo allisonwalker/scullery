@@ -18,11 +18,11 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
         <img
           src={recipe.photo_url ?? PLACEHOLDER}
           alt={recipe.title}
-          className="w-full h-36 object-cover rounded-t-lg"
+          className="w-full h-36 object-cover rounded-t-xl"
         />
         <div className="p-3">
           <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="text-sm font-semibold text-gray-900 group-hover:text-brand-700 line-clamp-2">
+            <h3 className="font-serif text-sm font-semibold text-gray-900 group-hover:text-brand-700 line-clamp-2">
               {recipe.title}
             </h3>
             <MealTypeBadge type={recipe.meal_type} />
@@ -42,7 +42,7 @@ export default function RecipeCard({ recipe }: RecipeCardProps) {
           {recipe.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {recipe.tags.slice(0, 3).map((tag) => (
-                <span key={tag} className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
+                <span key={tag} className="text-[10px] bg-brand-50 text-brand-600 px-1.5 py-0.5 rounded-full border border-brand-100">
                   {tag}
                 </span>
               ))}

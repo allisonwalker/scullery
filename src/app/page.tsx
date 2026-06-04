@@ -104,9 +104,9 @@ export default async function HomePage() {
         {/* ── Greeting ───────────────────────────────────────────────────── */}
         <div className="mb-8">
           {householdName && (
-            <p className="text-sm font-medium text-brand-500 mb-1.5">{householdName}</p>
+            <p className="text-sm font-medium text-brand-600 mb-1.5">{householdName}</p>
           )}
-          <h1 className="font-serif italic text-3xl text-gray-800 leading-tight text-balance">
+          <h1 className="font-serif italic text-[2rem] text-gray-900 leading-tight text-balance">
             {greeting}, {firstName}.
           </h1>
         </div>
@@ -135,7 +135,7 @@ export default async function HomePage() {
                 <Link
                   key={i}
                   href={`/planner/${weekStart}`}
-                  className="group flex flex-col items-center gap-1.5 py-2 rounded-xl transition-colors hover:bg-white hover:shadow-sm"
+                  className="group flex flex-col items-center gap-1.5 py-2 rounded-xl transition-all hover:bg-white hover:shadow-sm"
                 >
                   <span className={`text-[10px] font-semibold ${isToday ? 'text-brand-600' : 'text-gray-400'}`}>
                     {day}
@@ -182,8 +182,8 @@ export default async function HomePage() {
         <section className="mb-6" data-tour="tile-grocery">
           <Link
             href="/grocery"
-            className="flex items-center gap-4 bg-white border border-gray-200 rounded-xl px-4 py-3.5
-                       hover:border-brand-300 hover:bg-brand-50/40 hover:shadow-sm transition-all group"
+            className="flex items-center gap-4 bg-white border border-brand-100 rounded-xl px-4 py-3.5
+                       hover:border-brand-300 hover:shadow-md transition-all group"
           >
             <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
               <ShoppingCart size={17} className="text-brand-500" />
@@ -210,8 +210,8 @@ export default async function HomePage() {
           <Link
             href="/recipes"
             data-tour="tile-recipes"
-            className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3.5
-                       hover:border-brand-300 hover:shadow-sm transition-all group"
+            className="flex items-center gap-3 bg-white border border-brand-100 rounded-xl px-4 py-3.5
+                       hover:border-brand-300 hover:shadow-md transition-all group"
           >
             <BookOpen size={16} className="text-brand-500 shrink-0" />
             <div className="min-w-0">
@@ -227,8 +227,8 @@ export default async function HomePage() {
           <Link
             href="/settings"
             data-tour="tile-settings"
-            className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3.5
-                       hover:border-brand-300 hover:shadow-sm transition-all group"
+            className="flex items-center gap-3 bg-white border border-brand-100 rounded-xl px-4 py-3.5
+                       hover:border-brand-300 hover:shadow-md transition-all group"
           >
             <Settings size={16} className="text-gray-400 shrink-0" />
             <div className="min-w-0">
@@ -240,7 +240,7 @@ export default async function HomePage() {
 
         {/* ── AI nudge — only if plan exists but grocery not generated ────── */}
         {planId && !hasGroceryList && totalMeals > 0 && (
-          <div className="mt-4 flex items-start gap-3 bg-brand-50 border border-brand-200 rounded-xl px-4 py-3.5">
+          <div className="mt-4 flex items-start gap-3 bg-white border border-brand-200 rounded-xl px-4 py-3.5 shadow-sm">
             <Sparkles size={14} className="text-brand-500 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-brand-800">Your grocery list is ready to generate</p>

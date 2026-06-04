@@ -40,17 +40,21 @@ export default function SlideOver({
       {/* Panel */}
       <div
         className={cn(
-          'fixed top-0 right-0 h-full z-50 bg-white border-l border-gray-200',
-          'transform transition-transform duration-200 ease-in-out flex flex-col',
+          'fixed top-0 right-0 h-full z-50 bg-white border-l border-brand-100',
+          'transform transition-transform duration-200 ease-in-out flex flex-col shadow-xl',
           width,
           open ? 'translate-x-0' : 'translate-x-full',
         )}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <h2 className="font-semibold text-gray-900">{title}</h2>
+        <div className="flex items-start justify-between px-5 py-4 border-b border-brand-50">
+          <h2 className="font-semibold text-gray-900 text-base leading-snug pr-4 text-balance">
+            {title}
+          </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none"
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg
+                       text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
+            aria-label="Close"
           >
             ×
           </button>

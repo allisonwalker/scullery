@@ -412,8 +412,8 @@ export default function PlannerGrid({
                   <div
                     key={dayIdx}
                     className={cn(
-                      'grid gap-3 p-2 rounded-xl',
-                      isToday ? 'bg-brand-50/80 ring-1 ring-brand-200/50' : 'hover:bg-black/[0.02]',
+                      'grid gap-3 p-2 rounded-xl transition-colors',
+                      isToday ? 'bg-white/80 ring-1 ring-brand-200/40 shadow-sm' : 'hover:bg-white/50',
                     )}
                     style={{ gridTemplateColumns: gridCols }}
                   >
@@ -592,7 +592,7 @@ export default function PlannerGrid({
                       onClick={() => toggleDay(dayIdx)}
                       className={cn(
                         'w-full flex items-center justify-between px-4 py-3 text-left',
-                        isToday ? 'bg-brand-50/80' : 'bg-white',
+                        isToday ? 'bg-brand-50/60' : 'bg-white',
                       )}
                     >
                       <div className="flex items-center gap-3">
@@ -635,8 +635,8 @@ export default function PlannerGrid({
                                 ))}
                                 <button
                                   onClick={() => handleAddMeal(dayIdx, mealType)}
-                                  className="w-full border border-dashed border-gray-200 rounded-lg py-2 text-xs
-                                             text-gray-300 hover:border-brand-300 hover:text-brand-500 transition-colors"
+                                  className="w-full border border-dashed border-brand-200/50 rounded-xl py-2 text-xs
+                                             text-brand-300/60 hover:border-brand-400 hover:text-brand-500 hover:bg-brand-50/30 transition-all"
                                 >
                                   + add
                                 </button>
@@ -704,7 +704,7 @@ export default function PlannerGrid({
                       key={dayIdx}
                       className={cn(
                         'grid gap-3 p-2 rounded-xl transition-colors',
-                        isToday ? 'bg-brand-50/80 ring-1 ring-brand-200/50' : 'hover:bg-black/[0.015]',
+                        isToday ? 'bg-white/80 ring-1 ring-brand-200/40 shadow-sm' : 'hover:bg-white/50',
                       )}
                       style={{ gridTemplateColumns: gridCols }}
                     >
@@ -740,8 +740,8 @@ export default function PlannerGrid({
                             {cellSlots.length === 0 ? (
                               <button
                                 onClick={() => handleAddMeal(dayIdx, mealType)}
-                                className="w-full border border-dashed border-gray-200 rounded-lg py-3 text-xs
-                                           text-gray-300 hover:border-brand-300 hover:text-brand-500 transition-colors"
+                                className="w-full border border-dashed border-brand-200/50 rounded-xl py-3 text-xs
+                                           text-brand-300/60 hover:border-brand-400 hover:text-brand-500 hover:bg-brand-50/30 transition-all"
                               >
                                 +
                               </button>

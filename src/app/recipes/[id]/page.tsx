@@ -50,7 +50,7 @@ export default async function RecipeDetailPage({ params }: Props) {
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">{r.title}</h1>
+            <h1 className="font-serif italic text-2xl font-semibold text-gray-900">{r.title}</h1>
             <div className="flex items-center gap-2 mt-2">
               <MealTypeBadge type={r.meal_type} />
               {r.cook_time_minutes && (
@@ -77,7 +77,7 @@ export default async function RecipeDetailPage({ params }: Props) {
         {r.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-6">
             {r.tags.map((tag) => (
-              <span key={tag} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+              <span key={tag} className="text-xs bg-brand-50 text-brand-700 border border-brand-100 px-2.5 py-1 rounded-full">
                 {tag}
               </span>
             ))}
@@ -113,7 +113,7 @@ export default async function RecipeDetailPage({ params }: Props) {
 
         {/* Notes */}
         {r.notes && (
-          <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
             <h3 className="text-sm font-semibold text-amber-800 mb-1">Notes</h3>
             <p className="text-sm text-amber-700">{r.notes}</p>
           </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { Clock } from 'lucide-react'
 import { usePlannerStore } from '@/store/plannerStore'
 import SlideOver from '@/components/ui/SlideOver'
 import { MealTypeBadge } from '@/components/ui/Badge'
@@ -25,29 +26,32 @@ export default function RecipeSlideOver() {
             <img
               src={recipe.photo_url}
               alt={recipe.title}
-              className="w-full h-40 object-cover rounded-lg"
+              className="w-full h-44 object-cover rounded-xl"
             />
           )}
 
-          {/* Meta */}
+          {/* Meta row */}
           <div className="flex items-center gap-2 flex-wrap">
             <MealTypeBadge type={recipe.meal_type} />
             {recipe.cook_time_minutes && (
-              <span className="text-sm text-gray-500">⏱ {recipe.cook_time_minutes} min</span>
+              <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                <Clock size={11} />
+                {recipe.cook_time_minutes} min
+              </span>
             )}
             {recipe.rating && <StarRating value={recipe.rating} readonly />}
           </div>
 
           {/* Description */}
           {recipe.description && (
-            <p className="text-sm text-gray-600">{recipe.description}</p>
+            <p className="text-sm text-gray-600 leading-relaxed">{recipe.description}</p>
           )}
 
           {/* Tags */}
           {recipe.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {recipe.tags.map((tag) => (
-                <span key={tag} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                <span key={tag} className="text-xs bg-brand-50 text-brand-700 px-2.5 py-0.5 rounded-full border border-brand-100">
                   {tag}
                 </span>
               ))}
@@ -57,11 +61,11 @@ export default function RecipeSlideOver() {
           {/* Ingredients */}
           {(recipe.ingredients as Ingredient[]).length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Ingredients</h3>
-              <ul className="space-y-1">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Ingredients</h3>
+              <ul className="space-y-1.5">
                 {(recipe.ingredients as Ingredient[]).map((ing, i) => (
-                  <li key={i} className="text-sm text-gray-600 flex gap-2">
-                    <span className="text-gray-400 min-w-[80px]">
+                  <li key={i} className="text-sm text-gray-600 flex gap-3">
+                    <span className="text-gray-400 tabular-nums shrink-0 min-w-[72px]">
                       {ing.quantity} {ing.unit}
                     </span>
                     <span>{ing.name}</span>
@@ -74,16 +78,16 @@ export default function RecipeSlideOver() {
           {/* Instructions */}
           {recipe.instructions && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Instructions</h3>
-              <p className="text-sm text-gray-600 whitespace-pre-line">{recipe.instructions}</p>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Instructions</h3>
+              <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">{recipe.instructions}</p>
             </div>
           )}
 
           {/* Notes */}
           {recipe.notes && (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-1">Notes</h3>
-              <p className="text-sm text-gray-500 italic">{recipe.notes}</p>
+            <div className="bg-amber-50/60 border border-amber-100 rounded-xl px-4 py-3">
+              <h3 className="text-xs font-semibold text-amber-700 mb-1">Notes</h3>
+              <p className="text-sm text-amber-800/80 italic">{recipe.notes}</p>
             </div>
           )}
 
@@ -93,7 +97,7 @@ export default function RecipeSlideOver() {
               href={recipe.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-brand-600 hover:underline block truncate"
+              className="text-xs text-brand-600 hover:text-brand-700 hover:underline block truncate"
             >
               Original source ↗
             </a>

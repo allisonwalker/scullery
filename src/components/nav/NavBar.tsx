@@ -57,9 +57,9 @@ export default function NavBar() {
 
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Logo */}
-        <Link href="/planner" className="flex items-center gap-2 shrink-0">
-          <ChefHat size={18} className="text-brand-400" />
-          <span className="font-serif italic font-semibold text-[22px] text-brand-100 tracking-tight leading-none">
+        <Link href="/planner" className="flex items-center gap-2 shrink-0 group">
+          <ChefHat size={17} className="text-brand-500 group-hover:text-brand-400 transition-colors" />
+          <span className="font-serif italic font-semibold text-[23px] text-brand-50 tracking-tight leading-none">
             scullery
           </span>
         </Link>
@@ -68,9 +68,9 @@ export default function NavBar() {
         {householdName && (
           <>
             <div className="hidden sm:block w-px h-5 bg-brand-700" />
-            <div className="hidden sm:flex items-center gap-1.5 bg-brand-800 rounded-lg px-2.5 py-1">
-              <Users size={11} className="text-brand-500" />
-              <span className="text-[11px] font-semibold text-brand-300 tracking-wide">
+            <div className="hidden sm:flex items-center gap-1.5 bg-brand-800/60 rounded-xl px-2.5 py-1">
+              <Users size={10} className="text-brand-500" />
+              <span className="text-[11px] font-medium text-brand-300">
                 {householdName}
               </span>
             </div>
@@ -80,7 +80,7 @@ export default function NavBar() {
         {/* Separator */}
         <div className="hidden sm:block w-px h-5 bg-brand-700" />
 
-        {/* Nav links — icon-only on mobile, icon+label on sm+ */}
+        {/* Nav links */}
         <div className="flex items-center gap-0.5">
           {NAV.map((item) => {
             const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
@@ -89,10 +89,10 @@ export default function NavBar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                  'flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-medium transition-colors',
                   active
-                    ? 'bg-brand-700 text-white'
-                    : 'text-brand-300 hover:text-white hover:bg-brand-800',
+                    ? 'bg-brand-700/80 text-white'
+                    : 'text-brand-300 hover:text-brand-100 hover:bg-brand-800/60',
                 )}
               >
                 {item.icon}
@@ -103,10 +103,10 @@ export default function NavBar() {
         </div>
       </div>
 
-      {/* Sign out — icon-only on mobile */}
+      {/* Sign out */}
       <button
         onClick={signOut}
-        className="flex items-center gap-1.5 text-xs text-brand-400 hover:text-white transition-colors"
+        className="flex items-center gap-1.5 text-xs text-brand-500 hover:text-brand-200 transition-colors"
       >
         <LogOut size={13} />
         <span className="hidden sm:inline">Sign out</span>

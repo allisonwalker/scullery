@@ -10,10 +10,15 @@
   }
 
   body {
-    /* Sage-tinted near-white — pulls away from the warm AI parchment band (h:40-100).
-       Brand hue direction (h:145) at barely-perceptible chroma (0.003). */
-    background-color: oklch(0.98 0.003 145);
+    /* Committed sage — clearly brand-colored, not the AI parchment band (h:40-100) */
+    background-color: oklch(0.95 0.018 145);
     @apply text-gray-900;
+  }
+
+  /* Headings in Lora — kitchen warmth, editorial hierarchy */
+  h1, h2, h3, h4 {
+    font-family: var(--font-lora), Georgia, serif;
+    font-style: normal;
   }
 }
 
@@ -40,26 +45,29 @@
 
 @layer components {
   .card {
-    @apply bg-white border border-gray-200 rounded-lg;
+    @apply bg-white border border-brand-100 rounded-xl shadow-sm;
   }
 
   .btn-primary {
-    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-500 text-white
-           text-sm font-medium hover:bg-brand-600 transition-colors disabled:opacity-50;
+    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white
+           text-sm font-semibold hover:bg-brand-700 active:scale-[0.98] transition-all
+           disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300
-           bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors;
+    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200
+           bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50
+           active:scale-[0.98] transition-all;
   }
 
   .btn-ghost {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-gray-500
-           text-sm hover:bg-gray-100 transition-colors;
+           text-sm hover:bg-black/5 transition-colors;
   }
 
   .input {
-    @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
+    @apply w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
+           placeholder:text-gray-400
            focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent;
   }
 

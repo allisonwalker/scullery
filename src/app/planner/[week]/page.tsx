@@ -33,7 +33,7 @@ export default async function PlannerWeekPage({ params }: Props) {
     // Profile missing — show a friendly prompt instead of redirecting to /login
     // (redirecting there creates a loop because middleware bounces logged-in users back)
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 text-center" style={{ backgroundColor: 'oklch(0.98 0.003 145)' }}>
+      <div className="min-h-screen flex items-center justify-center px-4 text-center">
         <div className="max-w-sm">
           <p className="text-lg font-semibold text-gray-800 mb-2">Your account isn't set up yet</p>
           <p className="text-sm text-gray-500 leading-relaxed">

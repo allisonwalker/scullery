@@ -85,8 +85,9 @@ export default function MealCard({ slot }: MealCardProps) {
     return (
       <button
         onClick={() => openSwapSheet(slot)}
-        className="w-full text-left border border-dashed border-gray-200 rounded-lg px-3 py-2.5
-                   text-xs text-gray-400 hover:border-brand-400 hover:text-brand-600 transition-colors"
+        className="w-full text-left border border-dashed border-brand-200/60 rounded-xl px-3 py-2.5
+                   text-xs text-brand-400/60 hover:border-brand-400 hover:text-brand-500
+                   hover:bg-brand-50/40 transition-all"
       >
         + choose recipe
       </button>
@@ -99,8 +100,8 @@ export default function MealCard({ slot }: MealCardProps) {
     <>
       <div
         className={cn(
-          'card overflow-hidden relative group cursor-pointer transition-all hover:shadow-sm',
-          slot.is_locked && 'ring-1 ring-amber-300 bg-amber-50/30',
+          'card overflow-hidden relative group cursor-pointer transition-all hover:shadow-md',
+          slot.is_locked && 'ring-2 ring-amber-300/60 bg-amber-50/20',
         )}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -197,7 +198,7 @@ export default function MealCard({ slot }: MealCardProps) {
           </div>
 
           {/* Title */}
-          <p className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2">
+          <p className="font-serif text-xs font-semibold text-gray-900 leading-snug line-clamp-2">
             {recipe.title}
           </p>
 

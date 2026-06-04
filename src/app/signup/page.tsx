@@ -64,7 +64,7 @@ export default function SignupPage() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
           <ChefHat size={20} className="text-brand-400" />
-          <span className="font-serif italic font-semibold text-[24px] text-gray-800 tracking-tight leading-none">
+          <span className="font-serif italic font-semibold text-[24px] text-brand-800 tracking-tight leading-none">
             scullery
           </span>
         </div>
