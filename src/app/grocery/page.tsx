@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { GroceryList, GroceryItem } from '@/types'
 import { CATEGORY_ORDER, CATEGORY_LABELS } from '@/lib/grocery/categories'
 import { getMondayOfWeek, formatWeekStart, weekLabel, cn } from '@/lib/utils'
+import { ChefHat, X } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -467,7 +468,7 @@ export default function GroceryPage() {
               if (!items.length) return null
               return (
                 <div key={cat}>
-                  <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2.5">
+                  <h2 className="text-xs font-semibold text-gray-500 mb-1.5 px-3">
                     {CATEGORY_LABELS[cat]}
                   </h2>
                   <div className="space-y-0.5">
@@ -479,16 +480,18 @@ export default function GroceryPage() {
                         <div
                           key={idx}
                           className={cn(
-                            'flex items-center gap-2.5 px-2.5 py-1 rounded-lg group hover:bg-gray-50',
+                            'flex items-center gap-2 px-3 py-2 rounded-lg group hover:bg-white hover:shadow-sm transition-all',
                             item.checked && !isEditing && 'opacity-50',
                           )}
                         >
+                          {/* Checkbox — standalone, never blocked */}
                           <input
                             type="checkbox"
                             checked={item.checked}
                             onChange={() => { if (isEditing) setEditingIdx(null); toggleItem(realIdx) }}
                             className="accent-brand-500 w-4 h-4 rounded cursor-pointer shrink-0"
                           />
+
                           {isEditing ? (
                             <>
                               <input
@@ -514,26 +517,49 @@ export default function GroceryPage() {
                             </>
                           ) : (
                             <>
-                              <div className="flex-1 min-w-0">
-                                <span
-                                  className={cn('text-sm cursor-text leading-none', item.checked && 'line-through')}
-                                  onClick={() => !item.checked && (setEditingIdx(realIdx), setEditForm({ name: item.name, quantity: String(item.quantity), unit: item.unit }))}
-                                  title="Click to edit"
-                                >
-                                  {item.name}
-                                </span>
-                                {recipeNames.length > 0 && (
-                                  <div className="overflow-hidden max-h-0 group-hover:max-h-4 transition-all duration-150">
-                                    <p className="text-[11px] text-gray-400 truncate pt-0.5">{recipeNames.join(' · ')}</p>
-                                  </div>
-                                )}
-                              </div>
+                              {/* Item name — click to edit */}
+                              <span
+                                className={cn('flex-1 min-w-0 text-sm leading-snug cursor-text select-none', item.checked && 'line-through')}
+                                onClick={() => !item.checked && (setEditingIdx(realIdx), setEditForm({ name: item.name, quantity: String(item.quantity), unit: item.unit }))}
+                                title="Tap to edit"
+                              >
+                                {item.name}
+                              </span>
+
+                              {/* Quantity */}
                               <span className="text-xs text-gray-400 shrink-0 tabular-nums">{item.quantity} {item.unit}</span>
+
+                              {/* Recipe info — right side, hover tooltip */}
+                              {recipeNames.length > 0 && (
+                                <div className="relative group/recipe shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    className="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-brand-500 rounded transition-colors"
+                                    title={recipeNames.join(', ')}
+                                    aria-label={`Used in: ${recipeNames.join(', ')}`}
+                                  >
+                                    <ChefHat size={12} />
+                                  </button>
+                                  {/* Desktop tooltip */}
+                                  <div className="hidden sm:block absolute right-0 bottom-full mb-2 z-20 pointer-events-none
+                                                  opacity-0 group-hover/recipe:opacity-100 transition-opacity duration-150">
+                                    <div className="bg-gray-900 text-white text-[11px] rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
+                                      <p className="text-gray-400 text-[10px] mb-1 font-medium uppercase tracking-wide">Used in</p>
+                                      {recipeNames.map((name, i) => <p key={i}>{name}</p>)}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Delete */}
                               <button
                                 onClick={() => removeItem(realIdx)}
-                                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none shrink-0"
+                                className="shrink-0 text-gray-300 hover:text-red-400 transition-colors
+                                           opacity-100 sm:opacity-0 sm:group-hover:opacity-100
+                                           w-6 h-6 flex items-center justify-center rounded"
                                 title="Remove"
-                              >×</button>
+                              >
+                                <X size={13} />
+                              </button>
                             </>
                           )}
                         </div>
@@ -546,24 +572,27 @@ export default function GroceryPage() {
 
             {/* Extra items */}
             <div>
-              <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2.5">Extra</h2>
+              <h2 className="text-xs font-semibold text-gray-500 mb-1.5 px-3">Extra</h2>
               <div className="space-y-0.5">
                 {singleList.extra_items.map((item, idx) => (
                   <div
                     key={idx}
-                    className={cn('flex items-center gap-2.5 px-2.5 py-1 rounded-lg group hover:bg-gray-50', item.checked && 'opacity-50')}
+                    className={cn('flex items-center gap-2 px-3 py-2 rounded-lg group hover:bg-white hover:shadow-sm transition-all', item.checked && 'opacity-50')}
                   >
                     <input
                       type="checkbox" checked={item.checked}
                       onChange={() => toggleExtra(idx)}
                       className="accent-brand-500 w-4 h-4 rounded cursor-pointer"
                     />
-                    <span className={cn('text-sm flex-1 leading-none', item.checked && 'line-through')}>{item.name}</span>
+                    <span className={cn('text-sm flex-1 leading-snug select-none', item.checked && 'line-through')}>{item.name}</span>
                     <button
                       onClick={() => removeExtra(idx)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none"
+                      className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all
+                                 w-6 h-6 flex items-center justify-center rounded"
                       title="Remove"
-                    >×</button>
+                    >
+                      <X size={13} />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -587,7 +616,7 @@ export default function GroceryPage() {
               if (!items.length) return null
               return (
                 <div key={cat}>
-                  <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2.5">
+                  <h2 className="text-xs font-semibold text-gray-500 mb-1.5 px-3">
                     {CATEGORY_LABELS[cat]}
                   </h2>
                   <div className="space-y-0.5">
@@ -598,7 +627,7 @@ export default function GroceryPage() {
                         <div
                           key={item.itemKey}
                           className={cn(
-                            'flex items-center gap-2.5 px-2.5 py-1 rounded-lg group hover:bg-gray-50',
+                            'flex items-center gap-2 px-3 py-2 rounded-lg group hover:bg-white hover:shadow-sm transition-all',
                             checked && 'opacity-50',
                           )}
                         >
@@ -607,17 +636,30 @@ export default function GroceryPage() {
                             onChange={() => toggleMultiItem(item.itemKey)}
                             className="accent-brand-500 w-4 h-4 rounded cursor-pointer shrink-0"
                           />
-                          <div className="flex-1 min-w-0">
-                            <span className={cn('text-sm leading-none', checked && 'line-through')}>
-                              {item.name}
-                            </span>
-                            {recipeNames.length > 0 && (
-                              <div className="overflow-hidden max-h-0 group-hover:max-h-4 transition-all duration-150">
-                                <p className="text-[11px] text-gray-400 truncate pt-0.5">{recipeNames.join(' · ')}</p>
-                              </div>
-                            )}
-                          </div>
+                          <span className={cn('flex-1 min-w-0 text-sm leading-snug select-none', checked && 'line-through')}>
+                            {item.name}
+                          </span>
                           <span className="text-xs text-gray-400 shrink-0 tabular-nums">{item.quantity} {item.unit}</span>
+
+                          {/* Recipe info — right side tooltip */}
+                          {recipeNames.length > 0 && (
+                            <div className="relative group/recipe shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                              <button
+                                className="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-brand-500 rounded transition-colors"
+                                title={recipeNames.join(', ')}
+                                aria-label={`Used in: ${recipeNames.join(', ')}`}
+                              >
+                                <ChefHat size={12} />
+                              </button>
+                              <div className="hidden sm:block absolute right-0 bottom-full mb-2 z-20 pointer-events-none
+                                              opacity-0 group-hover/recipe:opacity-100 transition-opacity duration-150">
+                                <div className="bg-gray-900 text-white text-[11px] rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
+                                  <p className="text-gray-400 text-[10px] mb-1 font-medium uppercase tracking-wide">Used in</p>
+                                  {recipeNames.map((name, i) => <p key={i}>{name}</p>)}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
